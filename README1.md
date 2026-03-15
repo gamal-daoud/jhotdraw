@@ -8,7 +8,7 @@
 
 ## Enseignante : Madame   Imen Sayar  (imen.sayar@univ-lille.fr)
 1
-`Lien du projet :  https://github.com/wumpz/jhotdraw
+`Lien du projet :  https://github.com/gamal-daoud/jhotdraw
 
 ## Objectifs de ce projet :
 Étudier la qualité logicielle, Amélioration du projet.
