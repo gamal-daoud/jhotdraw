@@ -1,6 +1,11 @@
 # jhotdraw
 
 
+
+
+
+
+
 [![Java CI with Maven](https://github.com/wumpz/jhotdraw/actions/workflows/maven.yml/badge.svg)](https://github.com/wumpz/jhotdraw/actions/workflows/maven.yml)
 
 ## News
@@ -45,4 +50,4 @@ Additional to that are in module `jhotdraw-samples-misc` more sophisticated exam
 
 ## History 
 
-This is a fork of jhotdraw from http://sourceforge.net/projects/jhotdraw.
+This is a fork of jhotdraw from https://github.com/wumpz/jhotdraw

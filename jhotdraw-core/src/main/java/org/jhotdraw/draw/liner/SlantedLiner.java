@@ -18,11 +18,21 @@ import org.jhotdraw.utils.geom.path.BezierPath;
 
 /** SlantedLiner. */
 public class SlantedLiner implements Liner {
+  private static final double DEFAULT_SLANT_SIZE = 20;
+  private static final int PATH_SIZE_TWO_FIGURES = 4;
+  private static final int PATH_SIZE_SAME_FIGURE = 5;
+
+  // Node indices
+  private static final int START_NODE = 0;
+  private static final int FIRST_INTERMEDIATE_NODE = 1;
+  private static final int SECOND_INTERMEDIATE_NODE = 2;
+  private static final int THIRD_INTERMEDIATE_NODE = 3;
+  private static final int INSERT_INDEX = 1; // used when adding a new node
 
   private double slantSize;
 
   public SlantedLiner() {
-    this(20);
+    this(DEFAULT_SLANT_SIZE);
   }
 
   public SlantedLiner(double slantSize) {
@@ -45,11 +55,11 @@ public class SlantedLiner implements Liner {
     // Special treatment if the connection connects the same figure
     if (figure.getStartFigure() == figure.getEndFigure()) {
       // Ensure path has exactly four nodes
-      while (path.size() < 5) {
-        path.add(1, new BezierPath.Node(0, 0));
+      while (path.size() < PATH_SIZE_TWO_FIGURES) {
+        path.add(INSERT_INDEX, new BezierPath.Node(0, 0));
       }
-      while (path.size() > 5) {
-        path.remove(1);
+      while (path.size() > PATH_SIZE_SAME_FIGURE) {
+        path.remove(INSERT_INDEX);
       }
       Point2D.Double sp = start.findStart(figure);
       Point2D.Double ep = end.findEnd(figure);
@@ -63,7 +73,7 @@ public class SlantedLiner implements Liner {
       if (eoutcode == 0) {
         eoutcode = Geom.outcode(sb, eb);
       }
-      path.nodes().get(0).moveTo(sp);
+      path.nodes().get(START_NODE).moveTo(sp);
       path.nodes().get(path.size() - 1).moveTo(ep);
       switch (soutcode) {
         case Geom.OUT_TOP:
@@ -83,48 +93,64 @@ public class SlantedLiner implements Liner {
           soutcode = Geom.OUT_RIGHT;
           break;
       }
-      path.nodes().get(1).moveTo(sp.x + slantSize, sp.y);
+      path.nodes().get(FIRST_INTERMEDIATE_NODE).moveTo(sp.x + slantSize, sp.y);
       if ((soutcode & Geom.OUT_RIGHT) != 0) {
-        path.nodes().get(1).moveTo(sp.x + slantSize, sp.y);
+        path.nodes().get(FIRST_INTERMEDIATE_NODE).moveTo(sp.x + slantSize, sp.y);
       } else if ((soutcode & Geom.OUT_LEFT) != 0) {
-        path.nodes().get(1).moveTo(sp.x - slantSize, sp.y);
+        path.nodes().get(FIRST_INTERMEDIATE_NODE).moveTo(sp.x - slantSize, sp.y);
       } else if ((soutcode & Geom.OUT_BOTTOM) != 0) {
-        path.nodes().get(1).moveTo(sp.x, sp.y + slantSize);
+        path.nodes().get(FIRST_INTERMEDIATE_NODE).moveTo(sp.x, sp.y + slantSize);
       } else {
-        path.nodes().get(1).moveTo(sp.x, sp.y - slantSize);
+        path.nodes().get(FIRST_INTERMEDIATE_NODE).moveTo(sp.x, sp.y - slantSize);
       }
       if ((eoutcode & Geom.OUT_RIGHT) != 0) {
-        path.nodes().get(3).moveTo(ep.x + slantSize, ep.y);
+        path.nodes().get(THIRD_INTERMEDIATE_NODE).moveTo(ep.x + slantSize, ep.y);
       } else if ((eoutcode & Geom.OUT_LEFT) != 0) {
-        path.nodes().get(3).moveTo(ep.x - slantSize, ep.y);
+        path.nodes().get(THIRD_INTERMEDIATE_NODE).moveTo(ep.x - slantSize, ep.y);
       } else if ((eoutcode & Geom.OUT_BOTTOM) != 0) {
-        path.nodes().get(3).moveTo(ep.x, ep.y + slantSize);
+        path.nodes().get(THIRD_INTERMEDIATE_NODE).moveTo(ep.x, ep.y + slantSize);
       } else {
-        path.nodes().get(3).moveTo(ep.x, ep.y - slantSize);
+        path.nodes().get(THIRD_INTERMEDIATE_NODE).moveTo(ep.x, ep.y - slantSize);
       }
       switch (soutcode) {
         case Geom.OUT_RIGHT:
-          path.nodes().get(2).moveTo(path.nodes().get(1).x[0], path.nodes().get(3).y[0]);
+          path.nodes()
+              .get(SECOND_INTERMEDIATE_NODE)
+              .moveTo(
+                  path.nodes().get(FIRST_INTERMEDIATE_NODE).x[0],
+                  path.nodes().get(THIRD_INTERMEDIATE_NODE).y[0]);
           break;
         case Geom.OUT_TOP:
-          path.nodes().get(2).moveTo(path.nodes().get(1).y[0], path.nodes().get(3).x[0]);
+          path.nodes()
+              .get(SECOND_INTERMEDIATE_NODE)
+              .moveTo(
+                  path.nodes().get(FIRST_INTERMEDIATE_NODE).y[0],
+                  path.nodes().get(THIRD_INTERMEDIATE_NODE).x[0]);
           break;
         case Geom.OUT_LEFT:
-          path.nodes().get(2).moveTo(path.nodes().get(1).x[0], path.nodes().get(3).y[0]);
+          path.nodes()
+              .get(SECOND_INTERMEDIATE_NODE)
+              .moveTo(
+                  path.nodes().get(FIRST_INTERMEDIATE_NODE).x[0],
+                  path.nodes().get(THIRD_INTERMEDIATE_NODE).y[0]);
           break;
         case Geom.OUT_BOTTOM:
         default:
-          path.nodes().get(2).moveTo(path.nodes().get(1).y[0], path.nodes().get(3).x[0]);
+          path.nodes()
+              .get(SECOND_INTERMEDIATE_NODE)
+              .moveTo(
+                  path.nodes().get(FIRST_INTERMEDIATE_NODE).y[0],
+                  path.nodes().get(THIRD_INTERMEDIATE_NODE).x[0]);
           break;
       }
       // Regular treatment if the connection connects to two different figures
     } else {
       // Ensure path has exactly four nodes
-      while (path.size() < 4) {
-        path.add(1, new BezierPath.Node(0, 0));
+      while (path.size() < PATH_SIZE_TWO_FIGURES) {
+        path.add(INSERT_INDEX, new BezierPath.Node(0, 0));
       }
-      while (path.size() > 4) {
-        path.remove(1);
+      while (path.size() > PATH_SIZE_TWO_FIGURES) {
+        path.remove(INSERT_INDEX);
       }
       Point2D.Double sp = start.findStart(figure);
       Point2D.Double ep = end.findEnd(figure);
@@ -158,25 +184,25 @@ public class SlantedLiner implements Liner {
           eoutcode = Geom.outcode(sb, eb);
         }
       }
-      path.nodes().get(0).moveTo(sp);
+      path.nodes().get(START_NODE).moveTo(sp);
       path.nodes().get(path.size() - 1).moveTo(ep);
       if ((soutcode & Geom.OUT_RIGHT) != 0) {
-        path.nodes().get(1).moveTo(sp.x + slantSize, sp.y);
+        path.nodes().get(FIRST_INTERMEDIATE_NODE).moveTo(sp.x + slantSize, sp.y);
       } else if ((soutcode & Geom.OUT_LEFT) != 0) {
-        path.nodes().get(1).moveTo(sp.x - slantSize, sp.y);
+        path.nodes().get(FIRST_INTERMEDIATE_NODE).moveTo(sp.x - slantSize, sp.y);
       } else if ((soutcode & Geom.OUT_BOTTOM) != 0) {
-        path.nodes().get(1).moveTo(sp.x, sp.y + slantSize);
+        path.nodes().get(FIRST_INTERMEDIATE_NODE).moveTo(sp.x, sp.y + slantSize);
       } else {
-        path.nodes().get(1).moveTo(sp.x, sp.y - slantSize);
+        path.nodes().get(FIRST_INTERMEDIATE_NODE).moveTo(sp.x, sp.y - slantSize);
       }
       if ((eoutcode & Geom.OUT_RIGHT) != 0) {
-        path.nodes().get(2).moveTo(ep.x + slantSize, ep.y);
+        path.nodes().get(SECOND_INTERMEDIATE_NODE).moveTo(ep.x + slantSize, ep.y);
       } else if ((eoutcode & Geom.OUT_LEFT) != 0) {
-        path.nodes().get(2).moveTo(ep.x - slantSize, ep.y);
+        path.nodes().get(SECOND_INTERMEDIATE_NODE).moveTo(ep.x - slantSize, ep.y);
       } else if ((eoutcode & Geom.OUT_BOTTOM) != 0) {
-        path.nodes().get(2).moveTo(ep.x, ep.y + slantSize);
+        path.nodes().get(SECOND_INTERMEDIATE_NODE).moveTo(ep.x, ep.y + slantSize);
       } else {
-        path.nodes().get(2).moveTo(ep.x, ep.y - slantSize);
+        path.nodes().get(SECOND_INTERMEDIATE_NODE).moveTo(ep.x, ep.y - slantSize);
       }
     }
     // Ensure all path nodes are straight
