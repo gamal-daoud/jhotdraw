@@ -48,8 +48,11 @@ Raison : Assurer la cohérence avec le reste du code et éliminer tous les nombr
 https://github.com/gamal-daoud/jhotdraw/blob/develop/jhotdraw-core/src/main/java/org/jhotdraw/draw/liner/SlantedLiner.java
 
 
+# Extraction des nombres magiques
 
 # Ajout de trois constantes en tête de classe :
+Les nombres magiques pour la tolérance de clic et le multiplicateur de croissance ont été extraits dans des constantes protégées
+Justification: Améliore la lisibilité et facilite la maintenance.
 
 - HIT_TOLERANCE = 1.0 (remplace 1f utilisé dans contains)
 
@@ -58,11 +61,11 @@ https://github.com/gamal-daoud/jhotdraw/blob/develop/jhotdraw-core/src/main/java
 - SPLIT_TOLERANCE = 5f
 
 
-# Renommage des paramètres pour améliorer la lisibilité :
-Tous les paramètres de type Point2D.Double initialement nommés p (find, join, split) ont été renommés en point (dans findConnector, contains, findNode, chop, handleMouseClick).
-Tous les paramètres de type Graphics2D nommés g ont été renommés en graphics (dans drawStroke, drawCaps, drawFill)
+#  Renommage de variables :
+- Tous les paramètres de type Point2D.Double initialement nommés p (find, join, split) ont été renommés en point (dans findConnector, contains, findNode, chop, handleMouseClick).
+- Tous les paramètres de type Graphics2D nommés g ont été renommés en graphics (dans drawStroke, drawCaps, drawFill)
 
-
+https://github.com/gamal-daoud/jhotdraw/blob/develop/jhotdraw-core/src/main/java/org/jhotdraw/draw/figure/BezierFigure.java
 
 ## 7 Moyennes modifications
 
