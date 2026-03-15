@@ -49,10 +49,18 @@ https://github.com/gamal-daoud/jhotdraw/blob/develop/jhotdraw-core/src/main/java
 
 
 
+# Ajout de trois constantes en tête de classe :
+
+- HIT_TOLERANCE = 1.0 (remplace 1f utilisé dans contains)
+
+- HIT_GROWTH_MULTIPLIER = 2.0 (remplace le facteur 2 dans contains)
+
+- SPLIT_TOLERANCE = 5f
 
 
-
-
+# Renommage des paramètres pour améliorer la lisibilité :
+Tous les paramètres de type Point2D.Double initialement nommés p (find, join, split) ont été renommés en point (dans findConnector, contains, findNode, chop, handleMouseClick).
+Tous les paramètres de type Graphics2D nommés g ont été renommés en graphics (dans drawStroke, drawCaps, drawFill)
 
 
 
