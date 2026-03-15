@@ -45,9 +45,7 @@ Raison :rendre le code plus explicite egalement cela améliore la compréhension
 Ce qui a été modifié aussi : Dans le else (deux figures différentes), les boucles while utilisaient encore les nombres 4 et - Elles ont été remplacées par PATH_SIZE_TWO_FIGURES et INSERT_INDEX.
 Raison : Assurer la cohérence avec le reste du code et éliminer tous les nombres magiques résiduels. Cela garantit que toute modification future de ces valeurs se fera via les constantes.
 
-https://gitlab-etu.fil.univ-lille.fr/gamal.daoudyoussouf.etu/jhotdraw_gamal_daoud_partie2/-/blob/main/jhotdraw-develop/jhotdraw-core/src/main/java/org/jhotdraw/draw/liner/SlantedLiner.java?ref_type=heads
-
-
+https://github.com/gamal-daoud/jhotdraw/blob/develop/jhotdraw-core/src/main/java/org/jhotdraw/draw/liner/SlantedLiner.java
 
 
 
