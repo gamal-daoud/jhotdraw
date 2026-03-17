@@ -101,10 +101,22 @@ Par exemple:
   ..........
   }
 
-
+jhotdraw-core/src/main/java/org/jhotdraw/draw/figure/Attributes.java
+https://github.com/wumpz/jhotdraw/commit/e14f513a6a4533465430242c2dd68c1df0363a5e
 
 
 
 ## 8 Grandes modifications
 
+**Fichiers modifiés :**
+- `org.jhotdraw.draw.AbstractDrawing`
+- `org.jhotdraw.draw.DefaultDrawing`
+- `org.jhotdraw.draw.QuadTreeDrawing`
 
+https://github.com/gamal-daoud/jhotdraw/blob/develop/jhotdraw-core/src/main/java/org/jhotdraw/draw/AbstractDrawing.java
+https://github.com/gamal-daoud/jhotdraw/blob/develop/jhotdraw-core/src/main/java/org/jhotdraw/draw/DefaultDrawing.java
+https://github.com/gamal-daoud/jhotdraw/blob/develop/jhotdraw-core/src/main/java/org/jhotdraw/draw/QuadTreeDrawing.java
+
+**Ce qui a été modifié :** L'algorithme de la méthode `findFiguresWithin(Rectangle2D.Double)` était dupliqué presque à l'identique entre `DefaultDrawing` et `QuadTreeDrawing`. L'implémentation a été complètement remontée dans la classe parente `AbstractDrawing` où elle utilise d'autres méthodes de l'interface `Drawing` (comme `getChildren()`). Les deux sous-classes n'ont plus cette méthode et héritent du comportement standard.
+
+**Raison :** C'est une restructuration qui supprime du code dupliqué en appliquant le design pattern Template Method (ou du moins l'extraction vers une super-classe concrète utilisant des opérations polymorphiques). Toute future optimisation ou correction de bug sur cette méthode essentielle (`findFiguresWithin` est au cœur de la sélection d'objet dans l'interface) sera appliquée universellement, peu importe le type de canevas sous-jacent choisi.
