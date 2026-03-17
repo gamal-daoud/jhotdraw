@@ -47,7 +47,7 @@ Raison : Assurer la cohérence avec le reste du code et éliminer tous les nombr
 
 https://github.com/gamal-daoud/jhotdraw/blob/develop/jhotdraw-core/src/main/java/org/jhotdraw/draw/liner/SlantedLiner.java
 
-
+https://github.com/gamal-daoud/jhotdraw/commit/567c31a291c33b4462062d90c523b96a1b94ebe2#diff-1b138160f369b569b076af9d7150b24767b467075a33f7e7e4ff31a49165e377
 # Extraction des nombres magiques
 
 # Ajout de trois constantes en tête de classe :
@@ -67,10 +67,44 @@ Justification: Améliore la lisibilité et facilite la maintenance.
 
 https://github.com/gamal-daoud/jhotdraw/blob/develop/jhotdraw-core/src/main/java/org/jhotdraw/draw/figure/BezierFigure.java
 
+
+
+
+
 ## 7 Moyennes modifications
+
+# Ajouter des commentaires
+Des commentaire sont ajouté toutes les méthodes de la classe Attributes
+de paquetage figure pour comprendre ce qui fais la méthode.
+Par exemple:
+
+/*
+   * Removes an attribute from the figure and calls {@code attributeChanged} on all registered {@code FigureListener}s if the attribute value has changed.
+   * For efficiency reasons, the drawing is not automatically repainted. If you want the drawing to be repainted when the attribute is changed, you can either use {@code key.remove(figure); } or
+   * <pre>
+   * figure.willChange();
+   * figure.remove(...);
+   * figure.changed();
+   * </pre>
+   * @see AttributeKey#remove
+   **
+  * @param key The attribute key to remove.
+  * @param <T> The type of the attribute value.
+  * @return Returns the old value of the attribute that was removed, or {@code null} if the
+    attribute
+  *
+  was not set before.
+  * @see AttributeKey#remove
+  */
+
+  public <T> void removeAttribute(AttributeKey<T> key) {
+  ..........
+  }
 
 
 
 
 
 ## 8 Grandes modifications
+
+

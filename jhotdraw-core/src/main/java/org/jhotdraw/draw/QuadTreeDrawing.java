@@ -7,9 +7,6 @@
  */
 package org.jhotdraw.draw;
 
-import static org.jhotdraw.draw.AttributeKeys.*;
-
-import java.awt.Color;
 import java.awt.Graphics2D;
 import java.awt.geom.Point2D;
 import java.awt.geom.Rectangle2D;
@@ -21,7 +18,6 @@ import java.util.List;
 import java.util.function.Predicate;
 import org.jhotdraw.draw.event.FigureEvent;
 import org.jhotdraw.draw.figure.Figure;
-import org.jhotdraw.utils.geom.Geom;
 import org.jhotdraw.utils.geom.QuadTree;
 import org.jhotdraw.utils.util.*;
 
@@ -34,10 +30,11 @@ public class QuadTreeDrawing extends AbstractDrawing {
   private static final long serialVersionUID = 1L;
   private QuadTree<Figure> quadTree = new QuadTree<>();
   private boolean needsSorting = false;
+  private static final double FIND_FIGURE_PIXEL_TOLERANCE = 10.0;
 
   @Override
   public int indexOf(Figure figure) {
-    return CHILDREN.indexOf(figure);
+    return children.indexOf(figure);
   }
 
   @Override
@@ -62,7 +59,7 @@ public class QuadTreeDrawing extends AbstractDrawing {
     if (clipBounds != null) {
       draw(g, sort(quadTree.findIntersects(clipBounds)));
     } else {
-      draw(g, CHILDREN);
+      draw(g, children);
     }
   }
 
@@ -82,10 +79,6 @@ public class QuadTreeDrawing extends AbstractDrawing {
     }
   }
 
-  //  public List<Figure> getChildren(Rectangle2D.Double bounds) {
-  //    return new ArrayList<>(quadTree.findInside(bounds));
-  //  }
-
   @Override
   public Figure findFigureInside(Point2D.Double p) {
     Collection<Figure> c = quadTree.findContains(p);
@@ -101,7 +94,7 @@ public class QuadTreeDrawing extends AbstractDrawing {
   @Override
   public List<Figure> getFiguresFrontToBack() {
     ensureSorted();
-    return new ReversedList<>(CHILDREN);
+    return new ReversedList<>(children);
   }
 
   protected List<Figure> getFiguresFrontToBack(Collection<Figure> smallCollection) {
@@ -131,7 +124,7 @@ public class QuadTreeDrawing extends AbstractDrawing {
 
   @Override
   public Figure findFigure(Point2D.Double p, double scaleDenominator) {
-    double tolerance = 10 / 2 / scaleDenominator;
+    double tolerance = FIND_FIGURE_PIXEL_TOLERANCE / 2.0 / scaleDenominator;
     Rectangle2D.Double rect =
         new Rectangle2D.Double(p.x - tolerance, p.y - tolerance, 2 * tolerance, 2 * tolerance);
     for (Figure figure : findFigures(rect)) {
@@ -149,7 +142,7 @@ public class QuadTreeDrawing extends AbstractDrawing {
 
   @Override
   public List<Figure> findFigures(Point2D.Double p, double scaleDenominator) {
-    double tolerance = 10 / 2 / scaleDenominator;
+    double tolerance = FIND_FIGURE_PIXEL_TOLERANCE / 2.0 / scaleDenominator;
     Rectangle2D.Double rect =
         new Rectangle2D.Double(p.x - tolerance, p.y - tolerance, 2 * tolerance, 2 * tolerance);
     return findFigures(rect).stream()
@@ -250,30 +243,11 @@ public class QuadTreeDrawing extends AbstractDrawing {
   }
 
   @Override
-  public List<Figure> findFiguresWithin(Rectangle2D.Double bounds) {
-    List<Figure> contained = new ArrayList<>();
-    double scale = AttributeKeys.scaleFromContext(this);
-    for (Figure f : CHILDREN) {
-      Rectangle2D.Double r = f.getBounds(scale);
-      if (f.attr().get(TRANSFORM) != null) {
-        Rectangle2D rt = f.attr().get(TRANSFORM).createTransformedShape(r).getBounds2D();
-        r = (rt instanceof Rectangle2D.Double)
-            ? (Rectangle2D.Double) rt
-            : new Rectangle2D.Double(rt.getX(), rt.getY(), rt.getWidth(), rt.getHeight());
-      }
-      if (f.isVisible() && Geom.contains(bounds, r)) {
-        contained.add(f);
-      }
-    }
-    return contained;
-  }
-
-  @Override
   public void bringToFront(Figure figure) {
-    if (CHILDREN.remove(figure)) {
-      var maxLayer = CHILDREN.stream().mapToInt(f -> f.getLayer()).max().orElse(0) + 1;
+    if (children.remove(figure)) {
+      var maxLayer = children.stream().mapToInt(f -> f.getLayer()).max().orElse(0) + 1;
 
-      CHILDREN.add(figure);
+      children.add(figure);
       needsSorting = true;
       fireDrawingChanged(figure.getDrawingArea());
     }
@@ -281,8 +255,8 @@ public class QuadTreeDrawing extends AbstractDrawing {
 
   @Override
   public void sendToBack(Figure figure) {
-    if (CHILDREN.remove(figure)) {
-      CHILDREN.add(0, figure);
+    if (children.remove(figure)) {
+      children.add(0, figure);
       needsSorting = true;
       fireDrawingChanged(figure.getDrawingArea());
     }
@@ -291,7 +265,7 @@ public class QuadTreeDrawing extends AbstractDrawing {
   /** Ensures that the children are sorted in z-order sequence. */
   private void ensureSorted() {
     if (needsSorting) {
-      Collections.sort(CHILDREN, Comparator.comparing(Figure::getLayer));
+      Collections.sort(children, Comparator.comparing(Figure::getLayer));
       needsSorting = false;
     }
   }
@@ -325,24 +299,6 @@ public class QuadTreeDrawing extends AbstractDrawing {
         needsSorting = true;
         invalidate();
         fireDrawingChanged(e.getInvalidatedArea());
-      }
-    }
-  }
-
-  @Override
-  public void drawCanvas(Graphics2D g) {
-    if (attr().get(CANVAS_WIDTH) != null && attr().get(CANVAS_HEIGHT) != null) {
-      // Determine canvas color and opacity
-      Color canvasColor = attr().get(CANVAS_FILL_COLOR);
-      Double fillOpacity = attr().get(CANVAS_FILL_OPACITY);
-      if (canvasColor != null && fillOpacity > 0) {
-        canvasColor =
-            new Color((canvasColor.getRGB() & 0xffffff) | ((int) (fillOpacity * 255) << 24), true);
-        // Fill the canvas
-        Rectangle2D.Double r =
-            new Rectangle2D.Double(0, 0, attr().get(CANVAS_WIDTH), attr().get(CANVAS_HEIGHT));
-        g.setColor(canvasColor);
-        g.fill(r);
       }
     }
   }

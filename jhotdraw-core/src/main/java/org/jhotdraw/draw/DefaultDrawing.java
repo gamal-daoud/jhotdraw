@@ -7,9 +7,6 @@
  */
 package org.jhotdraw.draw;
 
-import static org.jhotdraw.draw.AttributeKeys.*;
-
-import java.awt.Color;
 import java.awt.Graphics2D;
 import java.awt.Rectangle;
 import java.awt.geom.Point2D;
@@ -23,7 +20,6 @@ import java.util.List;
 import java.util.Set;
 import java.util.function.Predicate;
 import org.jhotdraw.draw.figure.Figure;
-import org.jhotdraw.utils.geom.Geom;
 import org.jhotdraw.utils.util.ReversedList;
 
 /**
@@ -211,25 +207,6 @@ public class DefaultDrawing extends AbstractDrawing {
   }
 
   @Override
-  public List<Figure> findFiguresWithin(Rectangle2D.Double bounds) {
-    List<Figure> contained = new ArrayList<>();
-    double scale = AttributeKeys.scaleFromContext(this);
-    for (Figure f : getChildren()) {
-      Rectangle2D.Double r = f.getBounds(scale);
-      if (f.attr().get(TRANSFORM) != null) {
-        Rectangle2D rt = f.attr().get(TRANSFORM).createTransformedShape(r).getBounds2D();
-        r = (rt instanceof Rectangle2D.Double)
-            ? (Rectangle2D.Double) rt
-            : new Rectangle2D.Double(rt.getX(), rt.getY(), rt.getWidth(), rt.getHeight());
-      }
-      if (f.isVisible() && Geom.contains(bounds, r)) {
-        contained.add(f);
-      }
-    }
-    return contained;
-  }
-
-  @Override
   public Figure findFigureInside(Point2D.Double p) {
     Figure f = findFigure(p);
     return (f == null) ? null : f.findFigureInside(p);
@@ -250,31 +227,13 @@ public class DefaultDrawing extends AbstractDrawing {
   /** Ensures that the children are sorted in z-order sequence from back to front. */
   private void ensureSorted() {
     if (needsSorting) {
-      Collections.sort(CHILDREN, Comparator.comparing(Figure::getLayer));
+      Collections.sort(children, Comparator.comparing(Figure::getLayer));
       needsSorting = false;
     }
   }
 
   @Override
   public int indexOf(Figure figure) {
-    return CHILDREN.indexOf(figure);
-  }
-
-  @Override
-  public void drawCanvas(Graphics2D g) {
-    if (attr().get(CANVAS_WIDTH) != null && attr().get(CANVAS_HEIGHT) != null) {
-      // Determine canvas color and opacity
-      Color canvasColor = attr().get(CANVAS_FILL_COLOR);
-      Double fillOpacity = attr().get(CANVAS_FILL_OPACITY);
-      if (canvasColor != null && fillOpacity > 0) {
-        canvasColor =
-            new Color((canvasColor.getRGB() & 0xffffff) | ((int) (fillOpacity * 255) << 24), true);
-        // Fill the canvas
-        Rectangle2D.Double r =
-            new Rectangle2D.Double(0, 0, attr().get(CANVAS_WIDTH), attr().get(CANVAS_HEIGHT));
-        g.setColor(canvasColor);
-        g.fill(r);
-      }
-    }
+    return children.indexOf(figure);
   }
 }

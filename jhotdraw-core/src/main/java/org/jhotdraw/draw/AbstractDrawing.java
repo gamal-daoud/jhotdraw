@@ -40,8 +40,8 @@ public abstract class AbstractDrawing implements Drawing {
 
   protected transient Rectangle2D.Double cachedDrawingArea;
   protected int changingDepth = 0;
-  protected final List<Figure> CHILDREN = new ArrayList<>();
-  protected final List<Figure> UNMODIFIABLE_CHILDREN = Collections.unmodifiableList(CHILDREN);
+  protected final List<Figure> children = new ArrayList<>();
+  protected final List<Figure> unmodifiableChildren = Collections.unmodifiableList(children);
 
   protected EventHandler eventHandler = new EventHandler();
   protected EventListenerList listenerList = new EventListenerList();
@@ -107,7 +107,7 @@ public abstract class AbstractDrawing implements Drawing {
 
   @Override
   public void basicAdd(int index, Figure figure) {
-    CHILDREN.add(index, figure);
+    children.add(index, figure);
     figure.addFigureListener(eventHandler);
   }
 
@@ -190,17 +190,17 @@ public abstract class AbstractDrawing implements Drawing {
 
   @Override
   public Figure getChild(int index) {
-    return CHILDREN.get(index);
+    return children.get(index);
   }
 
   @Override
   public int getChildCount() {
-    return CHILDREN.size();
+    return children.size();
   }
 
   @Override
   public List<Figure> getChildren() {
-    return UNMODIFIABLE_CHILDREN;
+    return unmodifiableChildren;
   }
 
   @Override
@@ -214,7 +214,7 @@ public abstract class AbstractDrawing implements Drawing {
       if (getChildCount() == 0) {
         cachedDrawingArea = new Rectangle2D.Double();
       } else {
-        for (Figure f : CHILDREN) {
+        for (Figure f : children) {
           if (cachedDrawingArea == null) {
             cachedDrawingArea = f.getDrawingArea(factor);
           } else {
@@ -228,6 +228,26 @@ public abstract class AbstractDrawing implements Drawing {
         cachedDrawingArea.y,
         cachedDrawingArea.width,
         cachedDrawingArea.height);
+  }
+
+  @Override
+  public List<Figure> findFiguresWithin(Rectangle2D.Double bounds) {
+    List<Figure> contained = new ArrayList<>();
+    double scale = AttributeKeys.scaleFromContext(this);
+    for (Figure f : getChildren()) {
+      Rectangle2D.Double r = f.getBounds(scale);
+      if (f.attr().get(AttributeKeys.TRANSFORM) != null) {
+        Rectangle2D rt =
+            f.attr().get(AttributeKeys.TRANSFORM).createTransformedShape(r).getBounds2D();
+        r = (rt instanceof Rectangle2D.Double)
+            ? (Rectangle2D.Double) rt
+            : new Rectangle2D.Double(rt.getX(), rt.getY(), rt.getWidth(), rt.getHeight());
+      }
+      if (f.isVisible() && org.jhotdraw.utils.geom.Geom.contains(bounds, r)) {
+        contained.add(f);
+      }
+    }
+    return contained;
   }
 
   @Override
@@ -268,7 +288,7 @@ public abstract class AbstractDrawing implements Drawing {
 
   @Override
   public boolean remove(Figure figure) {
-    int index = CHILDREN.indexOf(figure);
+    int index = children.indexOf(figure);
     if (index == -1) {
       return false;
     } else {
@@ -322,7 +342,7 @@ public abstract class AbstractDrawing implements Drawing {
   }
 
   protected int basicRemove(Figure child) {
-    int index = CHILDREN.indexOf(child);
+    int index = children.indexOf(child);
     if (index != -1) {
       basicRemoveChild(index);
     }
@@ -330,7 +350,7 @@ public abstract class AbstractDrawing implements Drawing {
   }
 
   protected Figure basicRemoveChild(int index) {
-    Figure figure = CHILDREN.remove(index);
+    Figure figure = children.remove(index);
     figure.removeFigureListener(eventHandler);
     invalidate();
     return figure;
@@ -459,6 +479,28 @@ public abstract class AbstractDrawing implements Drawing {
     @Override
     public void figureRemoved(FigureEvent e) {
       invalidate();
+    }
+  }
+
+  @Override
+  public void drawCanvas(java.awt.Graphics2D g) {
+    if (attr().get(org.jhotdraw.draw.AttributeKeys.CANVAS_WIDTH) != null
+        && attr().get(org.jhotdraw.draw.AttributeKeys.CANVAS_HEIGHT) != null) {
+      // Determine canvas color and opacity
+      java.awt.Color canvasColor = attr().get(org.jhotdraw.draw.AttributeKeys.CANVAS_FILL_COLOR);
+      Double fillOpacity = attr().get(org.jhotdraw.draw.AttributeKeys.CANVAS_FILL_OPACITY);
+      if (canvasColor != null && fillOpacity > 0) {
+        canvasColor = new java.awt.Color(
+            (canvasColor.getRGB() & 0xffffff) | ((int) (fillOpacity * 255) << 24), true);
+        // Fill the canvas
+        java.awt.geom.Rectangle2D.Double r = new java.awt.geom.Rectangle2D.Double(
+            0,
+            0,
+            attr().get(org.jhotdraw.draw.AttributeKeys.CANVAS_WIDTH),
+            attr().get(org.jhotdraw.draw.AttributeKeys.CANVAS_HEIGHT));
+        g.setColor(canvasColor);
+        g.fill(r);
+      }
     }
   }
 }
