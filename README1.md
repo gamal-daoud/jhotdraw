@@ -46,10 +46,9 @@ Ce qui a été modifié aussi : Dans le else (deux figures différentes), les bo
 Raison : Assurer la cohérence avec le reste du code et éliminer tous les nombres magiques résiduels. Cela garantit que toute modification future de ces valeurs se fera via les constantes.
 
 https://github.com/gamal-daoud/jhotdraw/blob/develop/jhotdraw-core/src/main/java/org/jhotdraw/draw/liner/SlantedLiner.java
+https://github.com/gamal-daoud/jhotdraw/commit/567c31a291c33b4462062d90c523b96a1b94ebe2
 
-https://github.com/gamal-daoud/jhotdraw/commit/567c31a291c33b4462062d90c523b96a1b94ebe2#diff-1b138160f369b569b076af9d7150b24767b467075a33f7e7e4ff31a49165e377
 # Extraction des nombres magiques
-
 # Ajout de trois constantes en tête de classe :
 Les nombres magiques pour la tolérance de clic et le multiplicateur de croissance ont été extraits dans des constantes protégées
 Justification: Améliore la lisibilité et facilite la maintenance.
@@ -66,8 +65,7 @@ Justification: Améliore la lisibilité et facilite la maintenance.
 - Tous les paramètres de type Graphics2D nommés g ont été renommés en graphics (dans drawStroke, drawCaps, drawFill)
 
 https://github.com/gamal-daoud/jhotdraw/blob/develop/jhotdraw-core/src/main/java/org/jhotdraw/draw/figure/BezierFigure.java
-
-
+https://github.com/gamal-daoud/jhotdraw/commit/98ba34de01e85e2c21ac3145c63b8dd7efc42e38
 
 
 
@@ -108,15 +106,57 @@ https://github.com/wumpz/jhotdraw/commit/e14f513a6a4533465430242c2dd68c1df0363a5
 
 ## 8 Grandes modifications
 
-**Fichiers modifiés :**
-- `org.jhotdraw.draw.AbstractDrawing`
-- `org.jhotdraw.draw.DefaultDrawing`
-- `org.jhotdraw.draw.QuadTreeDrawing`
+# Suppression de duplication de code:
+Le problème central était dans les méthodes (drawDrawingVolatileBuffered et drawDrawingNonvolatileBuffered)
+contenaient deux blocs identiques:
+- Bloc 1
+calcul du shift et mise à jour de bufferedArea/dirtyArea
 
-https://github.com/gamal-daoud/jhotdraw/blob/develop/jhotdraw-core/src/main/java/org/jhotdraw/draw/AbstractDrawing.java
-https://github.com/gamal-daoud/jhotdraw/blob/develop/jhotdraw-core/src/main/java/org/jhotdraw/draw/DefaultDrawing.java
-https://github.com/gamal-daoud/jhotdraw/blob/develop/jhotdraw-core/src/main/java/org/jhotdraw/draw/QuadTreeDrawing.java
+Bloc 2
+- effacement et repaint de la zone sale
 
-**Ce qui a été modifié :** L'algorithme de la méthode `findFiguresWithin(Rectangle2D.Double)` était dupliqué presque à l'identique entre `DefaultDrawing` et `QuadTreeDrawing`. L'implémentation a été complètement remontée dans la classe parente `AbstractDrawing` où elle utilise d'autres méthodes de l'interface `Drawing` (comme `getChildren()`). Les deux sous-classes n'ont plus cette méthode et héritent du comportement standard.
 
-**Raison :** C'est une restructuration qui supprime du code dupliqué en appliquant le design pattern Template Method (ou du moins l'extraction vers une super-classe concrète utilisant des opérations polymorphiques). Toute future optimisation ou correction de bug sur cette méthode essentielle (`findFiguresWithin` est au cœur de la sélection d'objet dans l'interface) sera appliquée universellement, peu importe le type de canevas sous-jacent choisi.
+
+##  Analyse avant / après — SonarQube:
+
+#### Duplications
+
+| Métrique         | Avant | Après | Gain       |
+|------------------|-------|-------|------------|
+| Density          | 46.0% | 41.9% | -4.1%      |
+| Duplicated Lines | 714   | 634   | -80 lignes |
+| Duplicated Blocks| 19    | 17    | -2 blocs   |
+
+Les 2 bloc supprimés correspondent exactement aux deux blocs extraits dans (updateBufferedAreaAndShift et repaintDirtyBufferArea).
+
+#### Complexité
+
+| Métrique             | Avant | Après | Gain |
+|----------------------|-------|-------|------|
+| Cyclomatic Complexity| 265   | 260   | -5   |
+| Cognitive Complexity | 279   | 261   | -18  |
+
+Le gain en Cognitive Complexity (-18) est plus important que le gain en Cyclomatic (-5). C'est logique : la Cognitive Complexity pénalise les structures imbriquées. En extrayant les if/else if chaînés du shift hors des méthodes principales, on réduit la profondeur d'imbrication perçue par le lecteur, ce que SonarQube récompense davantage.
+
+#### Taille et qualité
+
+| Métrique    | Avant     | Après | Gain       |
+|-------------|-----------|-------|------------|
+| Lines       | ~1 600    | 1 513 | -87 lignes |
+| Code Smells | 63        | 54    | -9         |
+| Functions   | —         | 94    | +2         |
+
+La réduction de ~87 lignes vient du fait que les deux blocs dupliqués ont été remplacés par un simple appel de méthode chacun. On ajoute 2 fonctions mais on gagne 9 Code Smells — SonarQube considère que le code est maintenant plus lisible et maintenable.
+
+# Ce que les chiffres confirment en expliquant
+La duplication était le problème principal. 80 lignes dupliquées sur 1 600 = c'est exactement les deux blocs identiques dans drawDrawingVolatileBuffered et drawDrawingNonvolatileBuffered. L'extraction en méthodes privées les a éliminés proprement.
+
+La complexité cognitive chute plus que la cyclomatique parce que les if/else if du calcul de shift étaient profondément imbriqués dans une boucle while(true) elle-même dans la méthode principale. En les sortant dans updateBufferedAreaAndShift, le niveau d'imbrication maximal des deux méthodes appelantes diminue.
+
+Les Code Smells passent de 63 à 54 (-9) confirme que SonarQube reconnaît directement la suppression de duplication comme une amélioration de maintenabilité, pas seulement un changement cosmétique.
+
+# Principe appliqué et ce qui a été fait :
+- Supprimer la duplication : blocs identiques extraits en méthodes updateBufferedAreaAndShift et repaintDirtyBufferArea.
+- Décomposer une méthode mixte : BufferUpdateResult sépare proprement retour et effet de bord.
+- Réduire la complexité cyclomatique : chaque méthode résultante a moins de branches imbriquées.
+
