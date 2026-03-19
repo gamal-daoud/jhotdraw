@@ -107,6 +107,9 @@ https://github.com/wumpz/jhotdraw/commit/e14f513a6a4533465430242c2dd68c1df0363a5
 ## 8 Grandes modifications
 
 # Suppression de duplication de code:
+les ensembles links des modifications ici
+https://github.com/gamal-daoud/jhotdraw/commit/5dd2d608b0319bb09856771ebf39c7000592c1e2
+
 Le problème central était dans les méthodes (drawDrawingVolatileBuffered et drawDrawingNonvolatileBuffered)
 contenaient deux blocs identiques:
 - Bloc 1
