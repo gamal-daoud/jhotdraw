@@ -558,8 +558,6 @@ public class DefaultDrawingView extends JComponent implements DrawingView, Edita
     }
   }
 
-  /// ==========
-
   /** Draws the drawing double buffered using a buffered image. */
   protected void drawDrawingNonvolatileBuffered(Graphics2D g) {
     Rectangle vr = getVisibleRect();
