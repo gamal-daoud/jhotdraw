@@ -108,7 +108,7 @@ https://github.com/wumpz/jhotdraw/commit/e14f513a6a4533465430242c2dd68c1df0363a5
 
 # Suppression de duplication de code:
 les ensembles links des modifications ici
-https://github.com/gamal-daoud/jhotdraw/commit/5dd2d608b0319bb09856771ebf39c7000592c1e2
+https://github.com/gamal-daoud/jhotdraw/commit/f41034ea044a6fbbead3b5379e57c135ab666ed1
 
 Le problème central était dans les méthodes (drawDrawingVolatileBuffered et drawDrawingNonvolatileBuffered)
 contenaient deux blocs identiques:
@@ -162,4 +162,6 @@ Les Code Smells passent de 63 à 54 (-9) confirme que SonarQube reconnaît direc
 - Supprimer la duplication : blocs identiques extraits en méthodes updateBufferedAreaAndShift et repaintDirtyBufferArea.
 - Décomposer une méthode mixte : BufferUpdateResult sépare proprement retour et effet de bord.
 - Réduire la complexité cyclomatique : chaque méthode résultante a moins de branches imbriquées.
+
+
 
