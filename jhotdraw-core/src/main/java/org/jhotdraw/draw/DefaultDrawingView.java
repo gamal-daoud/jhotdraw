@@ -59,9 +59,9 @@ import org.jhotdraw.draw.event.HandleEvent;
 import org.jhotdraw.draw.event.HandleListener;
 import org.jhotdraw.draw.figure.Figure;
 import org.jhotdraw.draw.handle.Handle;
+import org.jhotdraw.draw.handle.HandleManager; // <-- NOUVEAU
 import org.jhotdraw.draw.io.DefaultDrawingViewTransferHandler;
 import org.jhotdraw.utils.util.ResourceBundleUtil;
-import org.jhotdraw.utils.util.ReversedList;
 
 /**
  * A default implementation of {@link DrawingView} suited for viewing drawings with a small number
@@ -86,15 +86,12 @@ public class DefaultDrawingView extends JComponent implements DrawingView, Edita
 
   private final Set<Figure> UNMODIFIABLE_SELECTED_FIGURES =
       Collections.unmodifiableSet(SELECTED_FIGURES);
+  private final HandleManager handleManager = new HandleManager();
+  private Handle secondaryHandleOwner;
 
-  private java.util.List<Handle> selectionHandles = new ArrayList<>();
   private boolean isConstrainerVisible = false;
   private Constrainer visibleConstrainer = new GridConstrainer(8, 8);
   private Constrainer invisibleConstrainer = new GridConstrainer();
-  private Handle secondaryHandleOwner;
-  private Handle activeHandle;
-  private java.util.List<Handle> secondaryHandles = new ArrayList<>();
-  private boolean handlesAreValid = true;
   private transient Dimension cachedPreferredSize;
   private double scaleFactor = 1;
   private Point translation = new Point(0, 0);
@@ -363,10 +360,10 @@ public class DefaultDrawingView extends JComponent implements DrawingView, Edita
     @Override
     public void handleRequestSecondaryHandles(HandleEvent e) {
       secondaryHandleOwner = e.getHandle();
-      secondaryHandles.clear();
-      secondaryHandles.addAll(secondaryHandleOwner.createSecondaryHandles());
-      for (Handle h : secondaryHandles) {
+      handleManager.clearSecondaryHandles(); // <-- MODIFIÉ
+      for (Handle h : secondaryHandleOwner.createSecondaryHandles()) {
         h.setView(DefaultDrawingView.this);
+        handleManager.addSecondaryHandle(h); // <-- MODIFIÉ
         h.addHandleListener(eventHandler);
       }
       repaint();
@@ -387,7 +384,7 @@ public class DefaultDrawingView extends JComponent implements DrawingView, Edita
 
     @Override
     public void handleRequestRemove(HandleEvent e) {
-      selectionHandles.remove(e.getHandle());
+      handleManager.getSelectionHandles().remove(e.getHandle());
       e.getHandle().dispose();
       invalidateHandles();
       repaint(e.getInvalidatedArea());
@@ -784,10 +781,10 @@ public class DefaultDrawingView extends JComponent implements DrawingView, Edita
       figure.addFigureListener(handleInvalidator);
       Set<Figure> newSelection = new HashSet<>(SELECTED_FIGURES);
       Rectangle invalidatedArea = null;
-      if (handlesAreValid && getEditor() != null) {
+      if (handleManager.areHandlesValid() && getEditor() != null) {
         for (Handle h : figure.createHandles(detailLevel)) {
           h.setView(this);
-          selectionHandles.add(h);
+          handleManager.addSelectionHandle(h);
           h.addHandleListener(eventHandler);
           if (invalidatedArea == null) {
             invalidatedArea = h.getDrawingArea();
@@ -815,10 +812,10 @@ public class DefaultDrawingView extends JComponent implements DrawingView, Edita
         selectionChanged = true;
         newSelection.add(figure);
         figure.addFigureListener(handleInvalidator);
-        if (handlesAreValid && getEditor() != null) {
+        if (handleManager.areHandlesValid() && getEditor() != null) {
           for (Handle h : figure.createHandles(detailLevel)) {
             h.setView(this);
-            selectionHandles.add(h);
+            handleManager.addSelectionHandle(h);
             h.addHandleListener(eventHandler);
             if (invalidatedArea == null) {
               invalidatedArea = h.getDrawingArea();
@@ -920,21 +917,21 @@ public class DefaultDrawingView extends JComponent implements DrawingView, Edita
   /** Gets the currently active selection handles. */
   private java.util.List<Handle> getSelectionHandles() {
     validateHandles();
-    return Collections.unmodifiableList(selectionHandles);
+    return handleManager.getSelectionHandles();
   }
 
   /** Gets the currently active secondary handles. */
   private java.util.List<Handle> getSecondaryHandles() {
     validateHandles();
-    return Collections.unmodifiableList(secondaryHandles);
+    return handleManager.getSecondaryHandles();
   }
 
   /** Invalidates the handles. */
   private void invalidateHandles() {
-    if (handlesAreValid) {
-      handlesAreValid = false;
+    if (handleManager.areHandlesValid()) {
+      handleManager.setHandlesValid(false);
       Rectangle invalidatedArea = null;
-      for (Handle handle : selectionHandles) {
+      for (Handle handle : handleManager.getSelectionHandles()) {
         handle.removeHandleListener(eventHandler);
         if (invalidatedArea == null) {
           invalidatedArea = handle.getDrawingArea();
@@ -943,7 +940,7 @@ public class DefaultDrawingView extends JComponent implements DrawingView, Edita
         }
         handle.dispose();
       }
-      for (Handle handle : secondaryHandles) {
+      for (Handle handle : handleManager.getSecondaryHandles()) {
         handle.removeHandleListener(eventHandler);
         if (invalidatedArea == null) {
           invalidatedArea = handle.getDrawingArea();
@@ -952,8 +949,8 @@ public class DefaultDrawingView extends JComponent implements DrawingView, Edita
         }
         handle.dispose();
       }
-      selectionHandles.clear();
-      secondaryHandles.clear();
+      handleManager.clearSelectionHandles();
+      handleManager.clearSecondaryHandles();
       setActiveHandle(null);
       if (invalidatedArea != null) {
         repaint(invalidatedArea);
@@ -965,15 +962,15 @@ public class DefaultDrawingView extends JComponent implements DrawingView, Edita
   private void validateHandles() {
     // Validate handles only, if they are invalid, and if
     // the DrawingView has a DrawingEditor.
-    if (!handlesAreValid && getEditor() != null) {
-      handlesAreValid = true;
-      selectionHandles.clear();
+    if (!handleManager.areHandlesValid() && getEditor() != null) {
+      handleManager.setHandlesValid(true);
+      handleManager.clearSelectionHandles();
       Rectangle invalidatedArea = null;
       while (true) {
         for (Figure figure : getSelectedFigures()) {
           for (Handle handle : figure.createHandles(detailLevel)) {
             handle.setView(this);
-            selectionHandles.add(handle);
+            handleManager.addSelectionHandle(handle);
             handle.addHandleListener(eventHandler);
             if (invalidatedArea == null) {
               invalidatedArea = handle.getDrawingArea();
@@ -982,7 +979,7 @@ public class DefaultDrawingView extends JComponent implements DrawingView, Edita
             }
           }
         }
-        if (selectionHandles.size() == 0 && detailLevel != 0) {
+        if (handleManager.getSelectionHandles().size() == 0 && detailLevel != 0) {
           // No handles are available at the desired detail level.
           // Retry with detail level 0.
           detailLevel = 0;
@@ -1004,17 +1001,7 @@ public class DefaultDrawingView extends JComponent implements DrawingView, Edita
   @Override
   public Handle findHandle(Point p) {
     validateHandles();
-    for (Handle handle : new ReversedList<>(getSecondaryHandles())) {
-      if (handle.contains(p)) {
-        return handle;
-      }
-    }
-    for (Handle handle : new ReversedList<>(getSelectionHandles())) {
-      if (handle.contains(p)) {
-        return handle;
-      }
-    }
-    return null;
+    return handleManager.findHandle(p);
   }
 
   /**
@@ -1270,10 +1257,10 @@ public class DefaultDrawingView extends JComponent implements DrawingView, Edita
   }
 
   protected void fireViewTransformChanged() {
-    for (Handle handle : selectionHandles) {
+    for (Handle handle : handleManager.getSelectionHandles()) {
       handle.viewTransformChanged();
     }
-    for (Handle handle : secondaryHandles) {
+    for (Handle handle : handleManager.getSecondaryHandles()) {
       handle.viewTransformChanged();
     }
   }
@@ -1504,13 +1491,14 @@ public class DefaultDrawingView extends JComponent implements DrawingView, Edita
 
   // Variables declaration - do not modify//GEN-BEGIN:variables
   // End of variables declaration//GEN-END:variables
+
   @Override
   public void setActiveHandle(Handle newValue) {
-    Handle oldValue = activeHandle;
+    Handle oldValue = handleManager.getActiveHandle();
     if (oldValue != null) {
       repaint(oldValue.getDrawingArea());
     }
-    activeHandle = newValue;
+    handleManager.setActiveHandle(newValue);
     if (newValue != null) {
       repaint(newValue.getDrawingArea());
     }
@@ -1519,6 +1507,6 @@ public class DefaultDrawingView extends JComponent implements DrawingView, Edita
 
   @Override
   public Handle getActiveHandle() {
-    return activeHandle;
+    return handleManager.getActiveHandle();
   }
 }
