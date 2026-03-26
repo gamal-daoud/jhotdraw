@@ -13,17 +13,16 @@ import static org.jhotdraw.draw.AttributeKeys.PATH_CLOSED;
 import static org.jhotdraw.draw.AttributeKeys.START_DECORATION;
 import static org.jhotdraw.draw.AttributeKeys.STROKE_MITER_LIMIT;
 import static org.jhotdraw.draw.AttributeKeys.UNCLOSED_PATH_FILLED;
-import static org.jhotdraw.draw.AttributeKeys.WINDING_RULE;
 
 import java.awt.Graphics2D;
 import java.awt.event.MouseEvent;
 import java.awt.geom.AffineTransform;
-import java.awt.geom.Path2D;
 import java.awt.geom.Point2D;
 import java.awt.geom.Rectangle2D;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.OptionalInt;
 import javax.swing.undo.AbstractUndoableEdit;
 import javax.swing.undo.CannotRedoException;
 import javax.swing.undo.CannotUndoException;
@@ -64,8 +63,20 @@ import org.jhotdraw.utils.util.ResourceBundleUtil;
 public class BezierFigure extends AbstractAttributedFigure {
 
   private static final long serialVersionUID = 1L;
+
+  /**
+   * The tolerance for hit testing.
+   */
   protected static final double HIT_TOLERANCE = 1.0;
+
+  /**
+   * The multiplier for perpendicular hit growth.
+   */
   protected static final double HIT_GROWTH_MULTIPLIER = 2.0;
+
+  /**
+   * The tolerance for splitting a segment on double click.
+   */
   protected static final float SPLIT_TOLERANCE = 5f;
 
   protected BezierPath path;
@@ -98,12 +109,8 @@ public class BezierFigure extends AbstractAttributedFigure {
     attr().set(PATH_CLOSED, isClosed);
   }
 
-  /**
-   * Returns the Figures connector for the specified location. By default a {@link
-   * ChopBezierConnector} is returned.
-   */
   @Override
-  public Connector findConnector(Point2D.Double point, ConnectionFigure prototype) {
+  public Connector findConnector(Point2D.Double p, ConnectionFigure prototype) {
     return new ChopBezierConnector(this);
   }
 
@@ -112,118 +119,92 @@ public class BezierFigure extends AbstractAttributedFigure {
     return new ChopBezierConnector(this);
   }
 
-  // COMPOSITE FIGURES
-  // CLONING
-  // EVENT HANDLING
+  // --- Drawing and Hit Testing ---
+
   @Override
-  protected void drawStroke(Graphics2D graphics) {
+  public boolean contains(Point2D.Double p, double scaleDenominator) {
+    double tolerance = getHitTolerance(scaleDenominator);
+    if (isFillOrStrokeHit(p, tolerance, scaleDenominator)) {
+      return true;
+    }
     if (isClosed()) {
-      double grow = AttributeKeys.getPerpendicularDrawGrowth(
-          this, AttributeKeys.getScaleFactorFromGraphics(graphics));
-      if (grow == 0d) {
-        graphics.draw(path);
-      } else {
-        GrowStroke gs = new GrowStroke(
-            grow,
-            AttributeKeys.getStrokeTotalWidth(
-                    this, AttributeKeys.getScaleFactorFromGraphics(graphics))
-                * attr().get(STROKE_MITER_LIMIT));
-        graphics.draw(gs.createStrokedShape(path));
-      }
-    } else {
-      graphics.draw(getCappedPath(AttributeKeys.getScaleFactorFromGraphics(graphics)));
+      return false;
     }
-    drawCaps(graphics);
+    return isOpenPathHit(p, tolerance, scaleDenominator);
   }
 
-  protected void drawCaps(Graphics2D graphics) {
-    if (getNodeCount() > 1) {
-      if (attr().get(START_DECORATION) != null) {
-        BezierPath cp = getCappedPath(AttributeKeys.getScaleFactorFromGraphics(graphics));
-        Point2D.Double p1 = path.get(0, 0);
-        Point2D.Double p2 = cp.get(0, 0);
-        if (p2.equals(p1)) {
-          p2 = path.get(1, 0);
-        }
-        attr().get(START_DECORATION).draw(graphics, this, p1, p2);
-      }
-      if (attr().get(END_DECORATION) != null) {
-        BezierPath cp = getCappedPath(AttributeKeys.getScaleFactorFromGraphics(graphics));
-        Point2D.Double p1 = path.get(path.size() - 1, 0);
-        Point2D.Double p2 = cp.get(path.size() - 1, 0);
-        if (p2.equals(p1)) {
-          p2 = path.get(path.size() - 2, 0);
-        }
-        attr().get(END_DECORATION).draw(graphics, this, p1, p2);
-      }
-    }
-  }
-
-  @Override
-  protected void drawFill(Graphics2D graphics) {
-    if (isClosed() || attr().get(UNCLOSED_PATH_FILLED)) {
-      double grow = AttributeKeys.getPerpendicularFillGrowth(
-          this, AttributeKeys.getScaleFactorFromGraphics(graphics));
-      if (grow == 0d) {
-        graphics.fill(path);
-      } else {
-        GrowStroke gs = new GrowStroke(
-            grow,
-            AttributeKeys.getStrokeTotalWidth(
-                    this, AttributeKeys.getScaleFactorFromGraphics(graphics))
-                * attr().get(STROKE_MITER_LIMIT));
-        graphics.fill(gs.createStrokedShape(path));
-      }
-    }
-  }
-
-  @Override
-  public boolean contains(Point2D.Double point, double scaleDenominator) {
-    double tolerance = Math.max(
+  protected double getHitTolerance(double scaleDenominator) {
+    return Math.max(
         HIT_TOLERANCE,
         HIT_GROWTH_MULTIPLIER * AttributeKeys.getPerpendicularHitGrowth(this, scaleDenominator));
+  }
+
+  protected boolean isFillOrStrokeHit(Point2D.Double p, double tolerance, double scaleDenominator) {
     if (isClosed() || (attr().get(FILL_COLOR) != null && attr().get(UNCLOSED_PATH_FILLED))) {
-      if (path.contains(point)) {
+      if (path.contains(p)) {
         return true;
       }
-      double grow = tolerance;
       GrowStroke gs = new GrowStroke(
-          grow,
+          tolerance,
           AttributeKeys.getStrokeTotalWidth(this, scaleDenominator)
               * attr().get(STROKE_MITER_LIMIT));
-      if (gs.createStrokedShape(path).contains(point)) {
-        return true;
-      } else {
-        if (isClosed()) {
-          return false;
-        }
-      }
-    }
-    if (!isClosed()) {
-      if (getCappedPath(scaleDenominator).outlineContains(point, tolerance)) {
-        return true;
-      }
-      if (attr().get(START_DECORATION) != null) {
-        BezierPath cp = getCappedPath(scaleDenominator);
-        Point2D.Double p1 = path.get(0, 0);
-        Point2D.Double p2 = cp.get(0, 0);
-        // FIXME - Check here, if caps path contains the point
-        if (Geom.lineContainsPoint(p1.x, p1.y, p2.x, p2.y, point.x, point.y, tolerance)) {
-          return true;
-        }
-      }
-      if (attr().get(END_DECORATION) != null) {
-        BezierPath cp = getCappedPath(scaleDenominator);
-        Point2D.Double p1 = path.get(path.size() - 1, 0);
-        Point2D.Double p2 = cp.get(path.size() - 1, 0);
-        // FIXME - Check here, if caps path contains the point
-        if (Geom.lineContainsPoint(p1.x, p1.y, p2.x, p2.y, point.x, point.y, tolerance)) {
-          return true;
-        }
-      }
+      return gs.createStrokedShape(path).contains(p);
     }
     return false;
   }
+
+  protected boolean isOpenPathHit(Point2D.Double p, double tolerance, double scaleDenominator) {
+    if (getCappedPath(scaleDenominator).outlineContains(p, tolerance)) {
+      return true;
+    }
+    return isDecorationHit(p, tolerance, scaleDenominator);
+  }
+
+  protected boolean isDecorationHit(Point2D.Double p, double tolerance, double scaleDenominator) {
+    if (attr().get(START_DECORATION) != null) {
+      BezierPath cp = getCappedPath(scaleDenominator);
+      Point2D.Double p1 = path.get(0, 0);
+      Point2D.Double p2 = cp.get(0, 0);
+      if (Geom.lineContainsPoint(p1.x, p1.y, p2.x, p2.y, p.x, p.y, tolerance)) {
+        return true;
+      }
+    }
+    if (attr().get(END_DECORATION) != null) {
+      BezierPath cp = getCappedPath(scaleDenominator);
+      Point2D.Double p1 = path.get(path.size() - 1, 0);
+      Point2D.Double p2 = cp.get(path.size() - 1, 0);
+      return Geom.lineContainsPoint(p1.x, p1.y, p2.x, p2.y, p.x, p.y, tolerance);
+    }
+    return false;
+  }
+
+  public Point2D.Double chop(Point2D.Double p) {
+    if (isClosed()) {
+      double grow =
+          AttributeKeys.getPerpendicularHitGrowth(this, AttributeKeys.scaleFromContext(this));
+      if (grow == 0d) {
+        return path.chop(p);
+      } else {
+        GrowStroke gs = new GrowStroke(
+            grow,
+            AttributeKeys.getStrokeTotalWidth(this, AttributeKeys.scaleFromContext(this))
+                * attr().get(STROKE_MITER_LIMIT));
+        return Geom.chop(gs.createStrokedShape(path), p);
+      }
+    } else {
+      return path.chop(p);
+    }
+  }
+
+  public Point2D.Double getCenter() {
+    return path.getCenter();
+  }
+
+  public Point2D.Double getOutermostPoint() {
+    return path.nodes().get(path.indexOfOutermostNode()).getControlPoint(0);
+  }
+
+  // --- Handle Management ---
 
   @Override
   public Collection<Handle> createHandles(int detailLevel) {
@@ -270,12 +251,7 @@ public class BezierFigure extends AbstractAttributedFigure {
     return r;
   }
 
-  @Override
-  protected void validate() {
-    super.validate();
-    path.invalidatePath();
-    cappedPath = null;
-  }
+  // --- Bounds and Metadata ---
 
   /** Returns a clone of the bezier path of this figure. */
   public BezierPath getBezierPath() {
@@ -300,19 +276,7 @@ public class BezierFigure extends AbstractAttributedFigure {
     setConnectable(newValue);
   }
 
-  @Override
-  protected <T> void fireAttributeChanged(AttributeKey<T> attribute, T oldValue, T newValue) {
-    if (attribute == PATH_CLOSED) {
-      path.setClosed((Boolean) newValue);
-    } else if (attribute == WINDING_RULE) {
-      path.setWindingRule(
-          newValue == AttributeKeys.WindingRule.EVEN_ODD
-              ? Path2D.Double.WIND_EVEN_ODD
-              : Path2D.Double.WIND_NON_ZERO);
-    }
-    invalidate();
-    super.fireAttributeChanged(attribute, oldValue, newValue);
-  }
+  // --- Attributes ---
 
   /**
    * Sets the location of the first and the last <code>BezierPath.Node</code> of the BezierFigure.
@@ -339,57 +303,7 @@ public class BezierFigure extends AbstractAttributedFigure {
     cappedPath = null;
   }
 
-  /**
-   * Returns a path which is cappedPath at the ends, to prevent it from drawing under the end caps.
-   */
-  protected BezierPath getCappedPath(double factor) {
-    if (cappedPath == null || factor != cappedPathFactor) {
-      cappedPath = path.clone();
-      cappedPathFactor = factor;
-      if (isClosed()) {
-        cappedPath.setClosed(true);
-      } else {
-        if (cappedPath.size() > 1) {
-          if (attr().get(START_DECORATION) != null) {
-            BezierPath.Node p0 = cappedPath.nodes().get(0);
-            BezierPath.Node p1 = cappedPath.nodes().get(1);
-            Point2D.Double pp;
-            if ((p0.getMask() & BezierPath.C2_MASK) != 0) {
-              pp = p0.getControlPoint(2);
-            } else if ((p1.getMask() & BezierPath.C1_MASK) != 0) {
-              pp = p1.getControlPoint(1);
-            } else {
-              pp = p1.getControlPoint(0);
-            }
-            double radius = attr().get(START_DECORATION).getDecorationRadius(this, factor);
-            double lineLength = Geom.length(p0.getControlPoint(0), pp);
-            cappedPath.set(
-                0, 0, Geom.cap(pp, p0.getControlPoint(0), -Math.min(radius, lineLength)));
-          }
-          if (attr().get(END_DECORATION) != null) {
-            BezierPath.Node p0 = cappedPath.nodes().get(cappedPath.size() - 1);
-            BezierPath.Node p1 = cappedPath.nodes().get(cappedPath.size() - 2);
-            Point2D.Double pp;
-            if ((p0.getMask() & BezierPath.C1_MASK) != 0) {
-              pp = p0.getControlPoint(1);
-            } else if ((p1.getMask() & BezierPath.C2_MASK) != 0) {
-              pp = p1.getControlPoint(2);
-            } else {
-              pp = p1.getControlPoint(0);
-            }
-            double radius = attr().get(END_DECORATION).getDecorationRadius(this, factor);
-            double lineLength = Geom.length(p0.getControlPoint(0), pp);
-            cappedPath.set(
-                cappedPath.size() - 1,
-                0,
-                Geom.cap(pp, p0.getControlPoint(0), -Math.min(radius, lineLength)));
-          }
-          cappedPath.invalidatePath();
-        }
-      }
-    }
-    return cappedPath;
-  }
+  // --- Infrastructure ---
 
   /** Adds a control point. */
   public void addNode(BezierPath.Node p) {
@@ -427,22 +341,22 @@ public class BezierFigure extends AbstractAttributedFigure {
   }
 
   /** Sets the point coordinate of control point 0 at the specified node. */
-  public void setPoint(int index, Point2D.Double p) {
+  public void setPoint(int index, Point2D.Double newPoint) {
     BezierPath.Node node = path.nodes().get(index);
-    double dx = p.x - node.x[0];
-    double dy = p.y - node.y[0];
+    double deltaX = newPoint.x - node.x[0];
+    double deltaY = newPoint.y - node.y[0];
     for (int i = 0; i < node.x.length; i++) {
-      node.x[i] += dx;
-      node.y[i] += dy;
+      node.x[i] += deltaX;
+      node.y[i] += deltaY;
     }
     invalidate();
   }
 
   /** Sets the point coordinate of a control point. */
-  public void setPoint(int index, int ctrlPntIndex, Point2D.Double p) {
-    BezierPath.Node cp = new BezierPath.Node(path.nodes().get(index));
-    cp.setControlPoint(ctrlPntIndex, p);
-    setNode(index, cp);
+  public void setPoint(int index, int controlPointIndex, Point2D.Double newPoint) {
+    BezierPath.Node newNode = new BezierPath.Node(path.nodes().get(index));
+    newNode.setControlPoint(controlPointIndex, newPoint);
+    setNode(index, newNode);
   }
 
   /**
@@ -483,74 +397,52 @@ public class BezierFigure extends AbstractAttributedFigure {
     return getPoint(getNodeCount() - 1, 0);
   }
 
-  /**
-   * Finds a control point index. Returns -1 if no control point could be found. FIXME - Move this
-   * to BezierPath
-   */
-  public int findNode(Point2D.Double point) {
+  public OptionalInt findNode(Point2D.Double p) {
     BezierPath tp = path;
     for (int i = 0; i < tp.size(); i++) {
       BezierPath.Node p2 = tp.nodes().get(i);
-      if (p2.x[0] == point.x && p2.y[0] == point.y) {
-        return i;
+      if (p2.x[0] == p.x && p2.y[0] == p.y) {
+        return OptionalInt.of(i);
       }
     }
-    return -1;
+    return OptionalInt.empty();
   }
 
-  /**
-   * Gets the segment of the polyline that is hit by the given Point2D.Double.
-   *
-   * @param find a Point on the bezier path
-   * @param tolerance a tolerance, tolerance should take into account the line width, plus 2 divided
-   *     by the zoom factor.
-   * @return the index of the segment or -1 if no segment was hit.
-   */
-  public int findSegment(Point2D.Double find, double tolerance) {
+  public OptionalInt findSegment(Point2D.Double find, double tolerance) {
     return path.findSegment(find, tolerance);
   }
 
   /**
    * Joins two segments into one if the given Point2D.Double hits a node of the polyline.
    *
-   * @return true if the two segments were joined.
    * @param join a Point at a node on the bezier path
    * @param tolerance a tolerance, tolerance should take into account the line width, plus 2 divided
    *     by the zoom factor.
    */
-  public boolean joinSegments(Point2D.Double join, double tolerance) {
-    int i = findSegment(join, tolerance);
-    if (i != -1 && i > 1) {
-      removeNode(i);
-      return true;
+  public void joinSegments(Point2D.Double join, double tolerance) {
+    OptionalInt i = findSegment(join, tolerance);
+    if (i.isPresent() && i.getAsInt() > 1) {
+      removeNode(i.getAsInt());
     }
-    return false;
   }
 
   /**
    * Splits the segment at the given Point2D.Double if a segment was hit.
    *
-   * @return the index of the segment or -1 if no segment was hit.
    * @param split a Point on (or near) a line segment on the bezier path
    * @param tolerance a tolerance, tolerance should take into account the line width, plus 2 divided
    *     by the zoom factor.
    */
-  public int splitSegment(Point2D.Double split, double tolerance) {
-    int i = findSegment(split, tolerance);
-    if (i != -1) {
-      addNode(i + 1, new BezierPath.Node(split));
+  public void splitSegment(Point2D.Double split, double tolerance) {
+    OptionalInt i = findSegment(split, tolerance);
+    if (i.isPresent()) {
+      addNode(i.getAsInt() + 1, new BezierPath.Node(split));
     }
-    return i + 1;
   }
 
   /** Removes the Node at the specified index. */
   public BezierPath.Node removeNode(int index) {
     return path.remove(index);
-  }
-
-  /** Removes the Point2D.Double at the specified index. */
-  protected void removeAllNodes() {
-    path.clear();
   }
 
   /** Gets the node count. */
@@ -576,88 +468,221 @@ public class BezierFigure extends AbstractAttributedFigure {
     return path.clone();
   }
 
-  public Point2D.Double chop(Point2D.Double point) {
-    if (isClosed()) {
-      double grow =
-          AttributeKeys.getPerpendicularHitGrowth(this, AttributeKeys.scaleFromContext(this));
-      if (grow == 0d) {
-        return path.chop(point);
-      } else {
-        GrowStroke gs = new GrowStroke(
-            grow,
-            AttributeKeys.getStrokeTotalWidth(this, AttributeKeys.scaleFromContext(this))
-                * attr().get(STROKE_MITER_LIMIT));
-        return Geom.chop(gs.createStrokedShape(path), point);
-      }
-    } else {
-      return path.chop(point);
-    }
-  }
-
-  public Point2D.Double getCenter() {
-    return path.getCenter();
-  }
-
-  public Point2D.Double getOutermostPoint() {
-    return path.nodes().get(path.indexOfOutermostNode()).getControlPoint(0);
-  }
-
   /**
    * Joins two segments into one if the given Point2D.Double hits a node of the polyline.
-   *
-   * @return true if the two segments were joined.
    */
-  public int joinSegments(Point2D.Double join, float tolerance) {
-    return path.joinSegments(join, tolerance);
+  public void joinSegments(Point2D.Double join, float tolerance) {
+    joinSegments(join, (double) tolerance);
   }
 
   /**
    * Splits the segment at the given Point2D.Double if a segment was hit.
-   *
-   * @return the index of the segment or -1 if no segment was hit.
    */
-  public int splitSegment(Point2D.Double split, float tolerance) {
-    return path.splitSegment(split, tolerance);
+  public void splitSegment(Point2D.Double split, float tolerance) {
+    splitSegment(split, (double) tolerance);
   }
 
-  /** Handles a mouse click. */
   @Override
-  public boolean handleMouseClick(Point2D.Double point, MouseEvent evt, DrawingView view) {
+  public boolean handleMouseClick(Point2D.Double p, MouseEvent evt, DrawingView view) {
     if (evt.getClickCount() == 2 && view.getHandleDetailLevel() % 2 == 0) {
-      willChange();
-      final int index = splitSegment(point, SPLIT_TOLERANCE / view.getScaleFactor());
-      if (index != -1) {
-        final BezierPath.Node newNode = getNode(index);
-        fireUndoableEditHappened(new AbstractUndoableEdit() {
-          private static final long serialVersionUID = 1L;
-
-          @Override
-          public String getPresentationName() {
-            ResourceBundleUtil labels = ResourceBundleUtil.getBundle("org.jhotdraw.draw.Labels");
-            return labels.getString("edit.bezierPath.splitSegment.text");
-          }
-
-          @Override
-          public void redo() throws CannotRedoException {
-            super.redo();
-            willChange();
-            addNode(index, newNode);
-            changed();
-          }
-
-          @Override
-          public void undo() throws CannotUndoException {
-            super.undo();
-            willChange();
-            removeNode(index);
-            changed();
-          }
-        });
-        changed();
+      if (splitSegmentAt(p, SPLIT_TOLERANCE / view.getScaleFactor())) {
         evt.consume();
         return true;
       }
     }
     return false;
+  }
+
+  /**
+   * Splits a segment at the given point and adds an undoable edit.
+   *
+   * @param p The point at which to split the segment.
+   * @param tolerance The tolerance for finding a segment.
+   * @return true if a segment was split, false otherwise.
+   */
+  protected boolean splitSegmentAt(Point2D.Double p, double tolerance) {
+    willChange();
+    final OptionalInt segmentIndex = findSegment(p, tolerance);
+    if (segmentIndex.isPresent()) {
+      final int nodeIndex = segmentIndex.getAsInt() + 1;
+      splitSegment(p, tolerance);
+      final BezierPath.Node newNode = getNode(nodeIndex);
+      fireUndoableEditHappened(new AbstractUndoableEdit() {
+        private static final long serialVersionUID = 1L;
+
+        @Override
+        public String getPresentationName() {
+          ResourceBundleUtil labels = ResourceBundleUtil.getBundle("org.jhotdraw.draw.Labels");
+          return labels.getString("edit.bezierPath.splitSegment.text");
+        }
+
+        @Override
+        public void redo() throws CannotRedoException {
+          super.redo();
+          willChange();
+          addNode(nodeIndex, newNode);
+          changed();
+        }
+
+        @Override
+        public void undo() throws CannotUndoException {
+          super.undo();
+          willChange();
+          removeNode(nodeIndex);
+          changed();
+        }
+      });
+      changed();
+      return true;
+    }
+    return false;
+  }
+
+  // --- Protected Methods ---
+
+  @Override
+  protected void drawStroke(Graphics2D g) {
+    if (isClosed()) {
+      double grow = AttributeKeys.getPerpendicularDrawGrowth(
+          this, AttributeKeys.getScaleFactorFromGraphics(g));
+      if (grow == 0d) {
+        g.draw(path);
+      } else {
+        GrowStroke gs = new GrowStroke(
+            grow,
+            AttributeKeys.getStrokeTotalWidth(this, AttributeKeys.getScaleFactorFromGraphics(g))
+                * attr().get(STROKE_MITER_LIMIT));
+        g.draw(gs.createStrokedShape(path));
+      }
+    } else {
+      g.draw(getCappedPath(AttributeKeys.getScaleFactorFromGraphics(g)));
+    }
+    drawCaps(g);
+  }
+
+  protected void drawCaps(Graphics2D g) {
+    if (getNodeCount() > 1) {
+      if (attr().get(START_DECORATION) != null) {
+        BezierPath cp = getCappedPath(AttributeKeys.getScaleFactorFromGraphics(g));
+        Point2D.Double p1 = path.get(0, 0);
+        Point2D.Double p2 = cp.get(0, 0);
+        if (p2.equals(p1)) {
+          p2 = path.get(1, 0);
+        }
+        attr().get(START_DECORATION).draw(g, this, p1, p2);
+      }
+      if (attr().get(END_DECORATION) != null) {
+        BezierPath cp = getCappedPath(AttributeKeys.getScaleFactorFromGraphics(g));
+        Point2D.Double p1 = path.get(path.size() - 1, 0);
+        Point2D.Double p2 = cp.get(path.size() - 1, 0);
+        if (p2.equals(p1)) {
+          p2 = path.get(path.size() - 2, 0);
+        }
+        attr().get(END_DECORATION).draw(g, this, p1, p2);
+      }
+    }
+  }
+
+  @Override
+  protected void drawFill(Graphics2D g) {
+    if (isClosed() || attr().get(UNCLOSED_PATH_FILLED)) {
+      double grow = AttributeKeys.getPerpendicularFillGrowth(
+          this, AttributeKeys.getScaleFactorFromGraphics(g));
+      if (grow == 0d) {
+        g.fill(path);
+      } else {
+        GrowStroke gs = new GrowStroke(
+            grow,
+            AttributeKeys.getStrokeTotalWidth(this, AttributeKeys.getScaleFactorFromGraphics(g))
+                * attr().get(STROKE_MITER_LIMIT));
+        g.fill(gs.createStrokedShape(path));
+      }
+    }
+  }
+
+  @Override
+  protected void validate() {
+    super.validate();
+    path.invalidatePath();
+    cappedPath = null;
+  }
+
+  @Override
+  protected <T> void fireAttributeChanged(AttributeKey<T> attribute, T oldValue, T newValue) {
+    handleAttributeChange(attribute, newValue);
+    invalidate();
+    super.fireAttributeChanged(attribute, oldValue, newValue);
+  }
+
+  protected <T> void handleAttributeChange(AttributeKey<T> attribute, T newValue) {
+    if (attribute == PATH_CLOSED) {
+      path.setClosed((Boolean) newValue);
+    } else if (attribute == org.jhotdraw.draw.AttributeKeys.WINDING_RULE) {
+      path.setWindingRule(
+          newValue == org.jhotdraw.draw.AttributeKeys.WindingRule.EVEN_ODD
+              ? java.awt.geom.Path2D.Double.WIND_EVEN_ODD
+              : java.awt.geom.Path2D.Double.WIND_NON_ZERO);
+    }
+  }
+
+  /**
+   * Returns a path which is capped at the ends, to prevent it from drawing under the end caps.
+   */
+  protected BezierPath getCappedPath(double factor) {
+    if (cappedPath == null || factor != cappedPathFactor) {
+      cappedPath = path.clone();
+      cappedPathFactor = factor;
+      if (isClosed()) {
+        cappedPath.setClosed(true);
+      } else {
+        if (cappedPath.size() > 1) {
+          capStart(cappedPath, factor);
+          capEnd(cappedPath, factor);
+          cappedPath.invalidatePath();
+        }
+      }
+    }
+    return cappedPath;
+  }
+
+  protected void capStart(BezierPath path, double factor) {
+    if (attr().get(START_DECORATION) != null) {
+      BezierPath.Node p0 = path.nodes().get(0);
+      BezierPath.Node p1 = path.nodes().get(1);
+      Point2D.Double pp;
+      if ((p0.getMask() & BezierPath.C2_MASK) != 0) {
+        pp = p0.getControlPoint(2);
+      } else if ((p1.getMask() & BezierPath.C1_MASK) != 0) {
+        pp = p1.getControlPoint(1);
+      } else {
+        pp = p1.getControlPoint(0);
+      }
+      double radius = attr().get(START_DECORATION).getDecorationRadius(this, factor);
+      double lineLength = Geom.length(p0.getControlPoint(0), pp);
+      path.set(0, 0, Geom.cap(pp, p0.getControlPoint(0), -Math.min(radius, lineLength)));
+    }
+  }
+
+  protected void capEnd(BezierPath path, double factor) {
+    if (attr().get(END_DECORATION) != null) {
+      BezierPath.Node p0 = path.nodes().get(path.size() - 1);
+      BezierPath.Node p1 = path.nodes().get(path.size() - 2);
+      Point2D.Double pp;
+      if ((p0.getMask() & BezierPath.C1_MASK) != 0) {
+        pp = p0.getControlPoint(1);
+      } else if ((p1.getMask() & BezierPath.C2_MASK) != 0) {
+        pp = p1.getControlPoint(2);
+      } else {
+        pp = p1.getControlPoint(0);
+      }
+      double radius = attr().get(END_DECORATION).getDecorationRadius(this, factor);
+      double lineLength = Geom.length(p0.getControlPoint(0), pp);
+      path.set(
+          path.size() - 1, 0, Geom.cap(pp, p0.getControlPoint(0), -Math.min(radius, lineLength)));
+    }
+  }
+
+  protected void removeAllNodes() {
+    path.clear();
   }
 }
