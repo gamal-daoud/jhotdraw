@@ -11,7 +11,6 @@ import java.awt.event.*;
 import java.awt.geom.*;
 import java.io.*;
 import java.util.*;
-import javax.swing.undo.*;
 import org.jhotdraw.draw.Drawing;
 import org.jhotdraw.draw.DrawingView;
 import org.jhotdraw.draw.connector.Connector;
@@ -38,6 +37,9 @@ public class LineConnectionFigure extends LineFigure implements ConnectionFigure
   /** The name of the JaveBeans property {@code liner}. */
   public static final String LINER_PROPERTY = "liner";
 
+  /** Tolerance for splitting a segment on double click (same as in BezierFigure). */
+  private static final float SPLIT_TOLERANCE = 5f;
+
   private Connector startConnector;
   private Connector endConnector;
   private Liner liner;
@@ -56,15 +58,6 @@ public class LineConnectionFigure extends LineFigure implements ConnectionFigure
 
     @Override
     public void figureRemoved(FigureEvent evt) {
-      // The commented lines below must stay commented out.
-      // This is because, we must not set our connectors to null,
-      // in order to support reconnection using redo.
-      /*
-      if (evt.getFigure() == owner.getStartFigure()
-      || evt.getFigure() == owner.getEndFigure()) {
-      owner.setStartConnector(null);
-      owner.setEndConnector(null);
-      }*/
       owner.fireFigureRequestRemove();
     }
 
@@ -221,42 +214,6 @@ public class LineConnectionFigure extends LineFigure implements ConnectionFigure
   }
 
   // COMPOSITE FIGURES
-  // LAYOUT
-  /*
-  public Liner getBezierPathLayouter() {
-  return (Liner) get(BEZIER_PATH_LAYOUTER);
-  }
-  public void setBezierPathLayouter(Liner newValue) {
-  set(BEZIER_PATH_LAYOUTER, newValue);
-  }
-  /**
-   * Lays out the connection. This is called when the connection
-   * itself changes. By default the connection is recalculated
-   * /
-  public void layoutConnection() {
-  if (getStartConnector() != null && getEndConnector() != null) {
-  willChange();
-  Liner bpl = getBezierPathLayouter();
-  if (bpl != null) {
-  bpl.lineout(this);
-  } else {
-  if (getStartConnector() != null) {
-  Point2D.Double start = getStartConnector().findStart(this);
-  if(start != null) {
-  basicSetStartPoint(start);
-  }
-  }
-  if (getEndConnector() != null) {
-  Point2D.Double end = getEndConnector().findEnd(this);
-  if(end != null) {
-  basicSetEndPoint(end);
-  }
-  }
-  }
-  changed();
-  }
-  }
-   */
   // CLONING
   // EVENT HANDLING
   /**
@@ -289,10 +246,6 @@ public class LineConnectionFigure extends LineFigure implements ConnectionFigure
     // need them when we are added back to a drawing again. For example,
     // when an undo is performed, after the LineConnection has been
     // deleted.
-    /*
-    setStartConnector(null);
-    setEndConnector(null);
-     */
     super.removeNotify(drawing);
   }
 
@@ -322,9 +275,6 @@ public class LineConnectionFigure extends LineFigure implements ConnectionFigure
     if (this.liner != null) {
       that.liner = this.liner.clone();
     }
-    // FIXME - For safety reasons, we clone the connectors, but they would
-    // work, if we continued to use them. Maybe we should state somewhere
-    // whether connectors should be reusable, or not.
     // To work properly, that must be registered as a figure listener
     // to the connected figures.
     if (this.startConnector != null) {
@@ -336,7 +286,6 @@ public class LineConnectionFigure extends LineFigure implements ConnectionFigure
       that.getEndFigure().addFigureListener(that.connectionHandler);
     }
     if (that.startConnector != null && that.endConnector != null) {
-      // that.handleConnect(that.getStartConnector(), that.getEndConnector());
       that.updateConnection();
     }
     return that;
@@ -387,30 +336,8 @@ public class LineConnectionFigure extends LineFigure implements ConnectionFigure
   @Override
   public boolean handleMouseClick(Point2D.Double p, MouseEvent evt, DrawingView view) {
     if (getLiner() == null && evt.getClickCount() == 2) {
-      willChange();
-      final int index = splitSegment(p, (float) (5f / view.getScaleFactor()));
-      if (index != -1) {
-        final BezierPath.Node newNode = getNode(index);
-        fireUndoableEditHappened(new AbstractUndoableEdit() {
-          private static final long serialVersionUID = 1L;
-
-          @Override
-          public void redo() throws CannotRedoException {
-            super.redo();
-            willChange();
-            addNode(index, newNode);
-            changed();
-          }
-
-          @Override
-          public void undo() throws CannotUndoException {
-            super.undo();
-            willChange();
-            removeNode(index);
-            changed();
-          }
-        });
-        changed();
+      if (splitSegmentAt(p, SPLIT_TOLERANCE / view.getScaleFactor())) {
+        evt.consume();
         return true;
       }
     }
@@ -442,25 +369,6 @@ public class LineConnectionFigure extends LineFigure implements ConnectionFigure
     super.setNode(index, p);
   }
 
-  /*
-  public void basicSetPoint(int index, Point2D.Double p) {
-  if (index != 0 && index != getNodeCount() - 1) {
-  if (getStartConnector() != null) {
-  Point2D.Double start = getStartConnector().findStart(this);
-  if(start != null) {
-  basicSetStartPoint(start);
-  }
-  }
-  if (getEndConnector() != null) {
-  Point2D.Double end = getEndConnector().findEnd(this);
-  if(end != null) {
-  basicSetEndPoint(end);
-  }
-  }
-  }
-  super.basicSetPoint(index, p);
-  }
-   */
   @Override
   public void lineout() {
     if (liner != null) {
@@ -468,7 +376,6 @@ public class LineConnectionFigure extends LineFigure implements ConnectionFigure
     }
   }
 
-  /** FIXME - Liner must work with API of LineConnection! */
   @Override
   public BezierPath getBezierPath() {
     return path;
@@ -497,12 +404,12 @@ public class LineConnectionFigure extends LineFigure implements ConnectionFigure
   public void reverseConnection() {
     if (startConnector != null && endConnector != null) {
       handleDisconnect(startConnector, endConnector);
-      Connector tmpC = startConnector;
+      Connector oldStartConnector = startConnector;
       startConnector = endConnector;
-      endConnector = tmpC;
-      Point2D.Double tmpP = getStartPoint();
+      endConnector = oldStartConnector;
+      Point2D.Double oldStartPoint = getStartPoint();
       setStartPoint(getEndPoint());
-      setEndPoint(tmpP);
+      setEndPoint(oldStartPoint);
       handleConnect(startConnector, endConnector);
       updateConnection();
     }
