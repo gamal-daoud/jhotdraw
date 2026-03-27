@@ -188,7 +188,8 @@ https://github.com/gamal-daoud/jhotdraw/commit/20b469e1bf432e0443e3c36e954b9bff6
 
 
 
-### Grandes modifications (suite de Moyennes modifications)
+### Grandes modifications (suite des modifications sur la God Class DefaultDrawingView)
+Une partie des modifications à été faites dans les moyennes modifications
 
 
 ## Extraction de la gestion des handles — HandleManager:
@@ -219,7 +220,8 @@ Dans DefaultDrawingView :
 - Modifications dans DefaultDrawingView : suppression de ~150 lignes de code liées aux handles.
 
 
-# Bénéfices
+# Bénéfices et pourqui ces modifications?
+
 - Respect du principe de responsabilité unique : DefaultDrawingView se concentre désormais sur son rôle de vue.
 - Meilleure maintenabilité : les bugs relatifs aux handles sont isolés dans une classe dédiée.
 - Réduction de la taille de DefaultDrawingView (~200 lignes en moins).
@@ -228,3 +230,79 @@ Dans DefaultDrawingView :
 Liens
 - Commit : lien vers le commit
 https://github.com/gamal-daoud/jhotdraw/commit/0291848e529853769daa27ac8564aa2eb7137eab
+
+
+
+## 1 Petites modifications:
+
+### Extraction
+des nombres magiques dans BezierFigure.java
+## Fichier modifié :
+ `org.jhotdraw.draw.figure.BezierFigure`
+
+## Ce qui a été modifié :
+Extraction des tolérances de test de collision (`HIT_TOLERANCE`, `HIT_GROWTH_MULTIPLIER`) et de division de segment (`SPLIT_TOLERANCE`) en constantes statiques finales.
+- Raison :
+Élimine les "nombres magiques" pour améliorer la lisibilité et faciliter la maintenance.
+
+
+### Extraction
+des nombres magiques dans LineConnectionFigure.java
+## Fichier modifié :
+`org.jhotdraw.draw.figure.LineConnectionFigure`
+## Ce qui a été modifié :
+Remplacement de la valeur `5f` par la constante `SPLIT_TOLERANCE`.
+- Raison :
+Cohérence avec `BezierFigure` et documentation explicite de la valeur de tolérance.
+
+### Renommage de variables
+dans LineConnectionFigure.reverseConnection()
+## Fichier modifié :
+`org.jhotdraw.draw.figure.LineConnectionFigure`
+## Ce qui a été modifié :
+Renommage de `tmpC` en `oldStartConnector` et `tmpP` en `oldStartPoint`.
+- Raison :
+Améliore la clarté du code en utilisant des noms descriptifs qui reflètent le rôle des variables.
+
+### Suppression du code mort
+dans BezierFigure et LineConnectionFigure
+## Fichiers modifiés :
+`BezierFigure.java`, `LineConnectionFigure.java`
+## Ce qui a été modifié :
+Suppression de blocs de code commentés et de commentaires `FIXME` obsolètes.
+- Raison :
+Nettoyage de la base de code pour réduire le bruit visuel et améliorer la maintenabilité.
+
+### Réorganisation de la structure de BezierFigure.java
+## Fichier modifié :
+`BezierFigure.java`
+## e qui a été modifié :
+Réorganisation des membres de la classe pour suivre l'ordre standard : constantes, champs, constructeurs, méthodes publiques, puis méthodes protégées/privées.
+- Raison :
+Facilite la navigation dans le code et respecte les conventions de structure de classe Java.
+
+### Amélioration
+du nommage des paramètres dans BezierFigure.setPoint
+## Fichier modifié :
+`BezierFigure.java`
+## Ce qui a été modifié :
+Renommage des paramètres `p` en `newPoint` et `ctrlPntIndex` en `controlPointIndex`.
+- Raison :
+Plus grande expressivité des signatures de méthodes.
+
+
+## 2 Moyennes et Grande modifications:
+### Réduction de la complexité cyclomatique
+Réduction de la complexité cyclomatique  de getCappedPath()
+##  Fichier modifié :
+`BezierFigure.java`
+## Ce qui a été modifié :
+Décomposition de la méthode `getCappedPath()` en extrayant la logique de capping du début et de la fin du chemin dans les méthodes `capStart()` et `capEnd()`.
+- Raison :
+Diminue la complexité d'une méthode trop longue et améliore la modularité du code.
+
+Liens
+- Commit : lien vers le commit
+https://github.com/gamal-daoud/jhotdraw/commit/ef5c9f64b2c3ee561a037ac84510aa6ba9f0ea83
+
+https://github.com/gamal-daoud/jhotdraw/commit/bd9fb36f84acdbdbdcc17fce6e8cb97ed3305812
