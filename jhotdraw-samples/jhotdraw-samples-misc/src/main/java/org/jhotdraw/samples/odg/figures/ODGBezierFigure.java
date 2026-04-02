@@ -13,6 +13,7 @@ import static org.jhotdraw.draw.AttributeKeys.UNCLOSED_PATH_FILLED;
 import java.awt.event.*;
 import java.awt.geom.*;
 import java.util.*;
+import java.util.OptionalInt;
 import javax.swing.undo.*;
 import org.jhotdraw.draw.*;
 import org.jhotdraw.draw.figure.BezierFigure;
@@ -60,9 +61,11 @@ public class ODGBezierFigure extends BezierFigure {
   public boolean handleMouseClick(Point2D.Double p, MouseEvent evt, DrawingView view) {
     if (evt.getClickCount() == 2 /* && view.getHandleDetailLevel() == 0*/) {
       willChange();
-      final int index = splitSegment(p, (float) (5f / view.getScaleFactor()));
-      if (index != -1) {
-        final BezierPath.Node newNode = getNode(index);
+      final OptionalInt index = findSegment(p, 5f / view.getScaleFactor());
+      if (index.isPresent()) {
+        final int nodeIndex = index.getAsInt() + 1;
+        splitSegment(p, 5f / view.getScaleFactor());
+        final BezierPath.Node newNode = getNode(nodeIndex);
         fireUndoableEditHappened(new AbstractUndoableEdit() {
           private static final long serialVersionUID = 1L;
 
@@ -70,7 +73,7 @@ public class ODGBezierFigure extends BezierFigure {
           public void redo() throws CannotRedoException {
             super.redo();
             willChange();
-            addNode(index, newNode);
+            addNode(nodeIndex, newNode);
             changed();
           }
 
@@ -78,7 +81,7 @@ public class ODGBezierFigure extends BezierFigure {
           public void undo() throws CannotUndoException {
             super.undo();
             willChange();
-            removeNode(index);
+            removeNode(nodeIndex);
             changed();
           }
         });

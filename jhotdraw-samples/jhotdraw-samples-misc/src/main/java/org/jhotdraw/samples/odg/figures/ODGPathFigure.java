@@ -20,6 +20,7 @@ import java.awt.event.*;
 import java.awt.geom.*;
 import java.awt.image.BufferedImage;
 import java.util.*;
+import java.util.OptionalInt;
 import javax.swing.*;
 import javax.swing.undo.*;
 import org.jhotdraw.draw.*;
@@ -440,8 +441,8 @@ public class ODGPathFigure extends AbstractAttributedCompositeFigure implements 
     if (evt.getClickCount() == 2 && view.getHandleDetailLevel() % 2 == 0) {
       for (Figure child : getChildren()) {
         ODGBezierFigure bf = (ODGBezierFigure) child;
-        int index = bf.getBezierPath().findSegment(p, 5f / view.getScaleFactor());
-        if (index != -1) {
+        OptionalInt index = bf.getBezierPath().findSegment(p, 5f / view.getScaleFactor());
+        if (index.isPresent()) {
           bf.handleMouseClick(p, evt, view);
           evt.consume();
           return true;

@@ -190,7 +190,7 @@ public abstract class AbstractAttributedFigure implements Figure, Cloneable {
   }
 
   /**
-   * Sometimes basicAdd is used to initiale include elements into a drawing. This method can then be used, to
+   * Sometimes basicAdd is used to initially include elements into a drawing. This method can then be used, to
    * connect this figure with a Drawing.
    * @param d
    */
@@ -214,10 +214,6 @@ public abstract class AbstractAttributedFigure implements Figure, Cloneable {
   public void resetModified() {
     modified = false;
   }
-
-  //  protected Object getLock() {
-  //    return (getDrawing() == null) ? this : getDrawing().getLock();
-  //  }
 
   /** tool method to process a listener and create its event object lazily. */
   protected void fireFigureEvent(
@@ -476,11 +472,6 @@ public abstract class AbstractAttributedFigure implements Figure, Cloneable {
     return new Point2D.Double(r.x, r.y);
   }
 
-  /*
-  public Rectangle2D.Double getHitBounds() {
-  return getBounds();
-  }
-     */
   @Override
   public Dimension2DDouble getPreferredSize(double scale) {
     Rectangle2D.Double r = getBounds(scale);
@@ -559,6 +550,9 @@ public abstract class AbstractAttributedFigure implements Figure, Cloneable {
 
   protected FontRenderContext getFontRenderContext() {
     FontRenderContext frc = null;
+    if (getDrawing() != null) {
+      frc = getDrawing().getFontRenderContext();
+    }
     if (frc == null) {
       frc = new FontRenderContext(new AffineTransform(), true, true);
     }

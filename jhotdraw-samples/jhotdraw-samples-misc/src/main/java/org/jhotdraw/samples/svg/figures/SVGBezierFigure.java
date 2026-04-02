@@ -75,9 +75,11 @@ public class SVGBezierFigure extends BezierFigure {
               "Warning: SVGBezierFigure.handleMouseClick. Figure has noninvertible Transform.");
         }
       }
-      final int index = splitSegment(p, (float) (5f / view.getScaleFactor()));
-      if (index != -1) {
-        final BezierPath.Node newNode = getNode(index);
+      final OptionalInt index = findSegment(p, 5 / view.getScaleFactor());
+      if (index.isPresent()) {
+        final int nodeIndex = index.getAsInt() + 1;
+        splitSegment(p, 5 / view.getScaleFactor());
+        final BezierPath.Node newNode = getNode(nodeIndex);
         fireUndoableEditHappened(new AbstractUndoableEdit() {
           private static final long serialVersionUID = 1L;
 
@@ -91,7 +93,7 @@ public class SVGBezierFigure extends BezierFigure {
           public void redo() throws CannotRedoException {
             super.redo();
             willChange();
-            addNode(index, newNode);
+            addNode(nodeIndex, newNode);
             changed();
           }
 
@@ -99,7 +101,7 @@ public class SVGBezierFigure extends BezierFigure {
           public void undo() throws CannotUndoException {
             super.undo();
             willChange();
-            removeNode(index);
+            removeNode(nodeIndex);
             changed();
           }
         });
@@ -149,13 +151,8 @@ public class SVGBezierFigure extends BezierFigure {
     return (Rectangle2D.Double) cachedDrawingArea.clone();
   }
 
-  /**
-   * Gets the segment of the polyline that is hit by the given Point2D.Double.
-   *
-   * @return the index of the segment or -1 if no segment was hit.
-   */
   @Override
-  public int findSegment(Point2D.Double find, double tolerance) {
+  public OptionalInt findSegment(Point2D.Double find, double tolerance) {
     // Apply inverse of transform to point
     if (attr().get(TRANSFORM) != null) {
       try {
@@ -168,16 +165,8 @@ public class SVGBezierFigure extends BezierFigure {
     return getBezierPath().findSegment(find, tolerance);
   }
 
-  /**
-   * Joins two segments into one if the given Point2D.Double hits a node of the polyline.
-   *
-   * @return true if the two segments were joined.
-   * @param join a Point at a node on the bezier path
-   * @param tolerance a tolerance, tolerance should take into account the line width, plus 2 divided
-   *     by the zoom factor.
-   */
   @Override
-  public boolean joinSegments(Point2D.Double join, double tolerance) {
+  public void joinSegments(Point2D.Double join, double tolerance) {
     // Apply inverse of transform to point
     if (attr().get(TRANSFORM) != null) {
       try {
@@ -187,24 +176,14 @@ public class SVGBezierFigure extends BezierFigure {
             "Warning: SVGBezierFigure.findSegment. Figure has noninvertible Transform.");
       }
     }
-    int i = getBezierPath().findSegment(join, tolerance);
-    if (i != -1 && i > 1) {
-      removeNode(i);
-      return true;
+    OptionalInt i = getBezierPath().findSegment(join, tolerance);
+    if (i.isPresent() && i.getAsInt() > 1) {
+      removeNode(i.getAsInt());
     }
-    return false;
   }
 
-  /**
-   * Splits the segment at the given Point2D.Double if a segment was hit.
-   *
-   * @return the index of the segment or -1 if no segment was hit.
-   * @param split a Point on (or near) a segment of the bezier path
-   * @param tolerance a tolerance, tolerance should take into account the line width, plus 2 divided
-   *     by the zoom factor.
-   */
   @Override
-  public int splitSegment(Point2D.Double split, double tolerance) {
+  public void splitSegment(Point2D.Double split, double tolerance) {
     // Apply inverse of transform to point
     if (attr().get(TRANSFORM) != null) {
       try {
@@ -215,11 +194,10 @@ public class SVGBezierFigure extends BezierFigure {
             "Warning: SVGBezierFigure.findSegment. Figure has noninvertible Transform.");
       }
     }
-    int i = getBezierPath().findSegment(split, tolerance);
-    if (i != -1) {
-      addNode(i + 1, new BezierPath.Node(split));
+    OptionalInt i = getBezierPath().findSegment(split, tolerance);
+    if (i.isPresent()) {
+      addNode(i.getAsInt() + 1, new BezierPath.Node(split));
     }
-    return i + 1;
   }
 
   /**

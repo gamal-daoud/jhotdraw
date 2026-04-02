@@ -23,6 +23,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
+import java.util.OptionalInt;
 import org.jhotdraw.utils.geom.Geom;
 import org.jhotdraw.utils.geom.Shapes;
 
@@ -877,7 +878,7 @@ public class BezierPath implements Shape, Serializable, Cloneable {
    *
    * @return the index of the segment or -1 if no segment was hit.
    */
-  public int findSegment(Point2D.Double find, double tolerance) {
+  public OptionalInt findSegment(Point2D.Double find, double tolerance) {
     // XXX - This works only for straight lines!
     Node v1, v2;
     BezierPath tempPath = new BezierPath();
@@ -889,14 +890,14 @@ public class BezierPath implements Shape, Serializable, Cloneable {
       v2 = NODES.get(i + 1);
       if (v1.mask == 0 && v2.mask == 0) {
         if (Geom.lineContainsPoint(v1.x[0], v1.y[0], v2.x[0], v2.y[0], find.x, find.y, tolerance)) {
-          return i;
+          return OptionalInt.of(i);
         }
       } else {
         t1.setTo(v1);
         t2.setTo(v2);
         tempPath.invalidatePath();
         if (tempPath.outlineContains(find, tolerance)) {
-          return i;
+          return OptionalInt.of(i);
         }
       }
     }
@@ -905,18 +906,18 @@ public class BezierPath implements Shape, Serializable, Cloneable {
       v2 = NODES.get(0);
       if (v1.mask == 0 && v2.mask == 0) {
         if (Geom.lineContainsPoint(v1.x[0], v1.y[0], v2.x[0], v2.y[0], find.x, find.y, tolerance)) {
-          return NODES.size() - 1;
+          return OptionalInt.of(NODES.size() - 1);
         }
       } else {
         t1.setTo(v1);
         t2.setTo(v2);
         tempPath.invalidatePath();
         if (tempPath.outlineContains(find, tolerance)) {
-          return NODES.size() - 1;
+          return OptionalInt.of(NODES.size() - 1);
         }
       }
     }
-    return -1;
+    return OptionalInt.empty();
   }
 
   /**
@@ -924,15 +925,15 @@ public class BezierPath implements Shape, Serializable, Cloneable {
    *
    * @return the index of the joined segment or -1 if no segment was joined.
    */
-  public int joinSegments(Point2D.Double join, double tolerance) {
+  public OptionalInt joinSegments(Point2D.Double join, double tolerance) {
     for (int i = 0; i < NODES.size(); i++) {
       Node p = NODES.get(i);
       if (Geom.length(p.x[0], p.y[0], join.x, join.y) < tolerance) {
         NODES.remove(i);
-        return i;
+        return OptionalInt.of(i);
       }
     }
-    return -1;
+    return OptionalInt.empty();
   }
 
   /**
@@ -940,10 +941,11 @@ public class BezierPath implements Shape, Serializable, Cloneable {
    *
    * @return the index of the segment or -1 if no segment was hit.
    */
-  public int splitSegment(Point2D.Double split, double tolerance) {
-    int i = findSegment(split, tolerance);
-    int nextI = (i + 1) % NODES.size();
-    if (i != -1) {
+  public OptionalInt splitSegment(Point2D.Double split, double tolerance) {
+    OptionalInt segmentIndex = findSegment(split, tolerance);
+    if (segmentIndex.isPresent()) {
+      int i = segmentIndex.getAsInt();
+      int nextI = (i + 1) % NODES.size();
       if ((NODES.get(i).mask & C2_MASK) == C2_MASK && (NODES.get(nextI).mask & C1_MASK) == 0) {
         // quadto
         NODES.add(i + 1, new Node(C2_MASK, split, split, split));
@@ -959,8 +961,9 @@ public class BezierPath implements Shape, Serializable, Cloneable {
         // lineto
         NODES.add(i + 1, new Node(split));
       }
+      return OptionalInt.of(i + 1);
     }
-    return i + 1;
+    return OptionalInt.empty();
   }
 
   /**

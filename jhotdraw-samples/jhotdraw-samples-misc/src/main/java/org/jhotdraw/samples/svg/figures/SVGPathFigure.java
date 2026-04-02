@@ -468,8 +468,8 @@ public class SVGPathFigure extends AbstractAttributedCompositeFigure implements 
     if (evt.getClickCount() == 2 && view.getHandleDetailLevel() % 2 == 0) {
       for (Figure child : getChildren()) {
         SVGBezierFigure bf = (SVGBezierFigure) child;
-        int index = bf.findSegment(p, 5f / view.getScaleFactor());
-        if (index != -1) {
+        OptionalInt index = bf.findSegment(p, 5f / view.getScaleFactor());
+        if (index.isPresent()) {
           bf.handleMouseClick(p, evt, view);
           evt.consume();
           return true;
