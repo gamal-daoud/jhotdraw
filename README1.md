@@ -15,8 +15,7 @@ Lien:
 Étudier la qualité logicielle, Amélioration du projet.
 
 ## Introduction
-Après avoir analysé la qualité logicielle de JHotDraw (jhotdraw-core) dans la première partie, ce rapport présente les améliorations apportées au projet. Les modifications, classées par difficulté, visent à renforcer la cohérence et la maintenabilité du code en se concentrant sur quelques classes clés. Chaque changement est documenté : situation initiale, modification réalisée également amélioration de readme.
-
+Suite à l'évаluаtiоn de lа qualité lоgiсiellе de JHоtDraw (jhоtdraw-соre) dаns la première sеctiоn, ce rappоrt met en lumièrе lеs аméliоratiоns misеs en œuvrе dans le prоjet. Les ajustements, оrganisés par niveаu dе соmpleхité, оnt pоur оbjectif dе rеnfоrсer la cоhérеnce et la mаintеnabilité du cоde еn se cоncеntrant sur plusiеurs classеs еssentielles. Chaquе mоdificatiоn est sоignеusemеnt décritе, incluant l'étаt initial, lеs сhangemеnts еffеctués ainsi que les améliоratiоns appоrtéеs au fichiеr README.
 
 ## 6 Petites modifications:
 Ces modifications visaient à nettoyer le code, corriger des ambiguïtés et des bugs mineurs évidents pour améliorer la lisibilité globale.
@@ -107,6 +106,27 @@ Par exemple:
   ..........
   }
 
+
+  /**
+   * Sets an attribute on the figure and calls {@code attributeChanged} on all registered {@code
+   * FigureListener}s if the attribute value has changed.
+   *
+   * <p>For efficiency reasons, the drawing is not automatically repainted. If you want the drawing
+   * to be repainted when the attribute is changed, you can either use {@code key.set(figure,
+   * value); } or
+   *
+   * <pre>
+   * figure.willChange();
+   * figure.set(...);
+   * figure.changed();
+   * </pre>
+   *
+   * @see AttributeKey#set
+   */
+  public <T> Attributes set(final AttributeKey<T> key, final T newValue) {
+   ......
+    }
+
 jhotdraw-core/src/main/java/org/jhotdraw/draw/figure/Attributes.java
 Lien
 - Commit : lien vers le commit
@@ -130,31 +150,32 @@ Ces blocs ont été extraits dans deux méthodes privées :
 ##  Analyse avant / après — SonarQube:
 
 #### Duplications
-
+-------------------------------------------------
 | Métrique         | Avant | Après | Gain       |
 |------------------|-------|-------|------------|
 | Density          | 46.0% | 32.6% | -13.4%     |
 | Duplicated Lines | 714   | 494   |-220 lignes |
 | Duplicated Blocks| 19    |  15   | -4 blocs   |
-
+-------------------------------------------------
 table 1
 
 #### Complexité
-
+-----------------------------------------------
 | Métrique             | Avant | Après | Gain |
 |----------------------|-------|-------|------|
 | Cyclomatic Complexity| 265   | 256   | -9   |
 | Cognitive Complexity | 279   | 255   | -24  |
-
+-----------------------------------------------
 table 2
 
 #### Taille et qualité
-
+------------------------------------------------
 | Métrique    | Avant     | Après | Gain       |
 |-------------|-----------|-------|------------|
 | Lines codess| ~1 600    | 1 191 |-409 lignes |
 | Code Smells | 63        | 0     | -63        |
 | Functions   | —         | 94    | +2         |
+------------------------------------------------
 
 table 3
 
@@ -306,3 +327,146 @@ Liens
 https://github.com/gamal-daoud/jhotdraw/commit/ef5c9f64b2c3ee561a037ac84510aa6ba9f0ea83
 
 https://github.com/gamal-daoud/jhotdraw/commit/bd9fb36f84acdbdbdcc17fce6e8cb97ed3305812
+
+
+
+## 8 Grandes modifications
+
+
+## Ajout d'une super-classe `AbstractLinearLayouter` pour supprimer des méthodes dupliquées
+
+### Problème initial
+
+Le package `org.jhotdraw.draw.layouter` contenait deux classes `HorizontalLayouter` et `VerticalLayouter`, héritant toutes deux de `AbstractLayouter`. En les comparant, on constate que leurs méthodes `calculateLayout()` et `layout()` sont **structurellement identiques** : même algorithme, mêmes structures de contrôle (`for`, `switch` sur `Alignment`), mêmes formules mathématiques. Seule la direction (axe X pour l'horizontal, axe Y pour le vertical) change. Cette duplication représentait environ **~180 lignes dupliquées** entre les deux fichiers, ce qui constitue une violation directe du principe DRY (*Don't Repeat Yourself*).
+
+```
+Avant :
+  AbstractLayouter
+       ├── HorizontalLayouter   (calculateLayout + layout ~100 lignes)
+       └── VerticalLayouter     (calculateLayout + layout ~100 lignes, quasi-identiques)
+```
+
+### Solution : nouvelle super-classe abstraite `AbstractLinearLayouter`
+
+Une nouvelle classe abstraite `AbstractLinearLayouter` (entre `AbstractLayouter` et les deux layouters) a été introduite. Elle implémente les méthodes `calculateLayout()` et `layout()` de façon générique, en s'appuyant sur un ensemble de méthodes abstraites qui définissent **l'axe de disposition** :
+--------------------------------------------------------------------------------------
+| Méthode abstraite            | `HorizontalLayouter`    | `VerticalLayouter`        |
+|----------------------------- |-------------------------|---------------------------|
+| `getPrimaryPreferredSize()`  | `size.width`            | `size.height`             |
+| `getSecondaryPreferredSize()`| `size.height`           | `size.width`              |
+| `getPrimaryInsets()`         | `left + right`          | `top + bottom`            |
+| `getSecondaryInsets()`       | `top + bottom`          | `left + right`            |
+| `getPrimaryBound()`          | `rect.width`            | `rect.height`             |
+| `getSecondaryBound()`        | `rect.height`           | `rect.width`              |
+| `buildChildBounds()`         | alignement **vertical** | alignement **horizontal** |
+--------------------------------------------------------------------------------------
+
+```
+Après :
+  AbstractLayouter
+       └── AbstractLinearLayouter   (calculateLayout + layout partagés)
+                ├── HorizontalLayouter  (surcharge des hooks de direction)
+                └── VerticalLayouter    (surcharge des hooks de direction)
+```
+
+### Fichiers modifiés / créés
+--------------------------------------------------------------------------------------------------------------------|
+| Fichier                                 | Action                                                                  |
+|-------------------------------------------------------------------------------------------------------------------|
+| `layouter/AbstractLinearLayouter.java`  =>  **[NOUVEAU]** Superclasse commune avec l'algorithme générique         |
+| `layouter/HorizontalLayouter.java`      => **[MODIFIÉ]** Étend désormais `AbstractLinearLayouter`; toute la logique dupliquée supprimée (~70 lignes retirées)                                                                           |
+| `layouter/VerticalLayouter.java`        =>  **[MODIFIÉ]** Étend désormais `AbstractLinearLayouter`; toute la logique dupliquée supprimée (~70 lignes retirées)                                                                           |
+|-------------------------------------------------------------------------------------------------------------------|
+
+### Bénéfices
+
+- **Suppression de ~140 lignes dupliquées** entre les deux classes.
+- **Maintenabilité** : tout bug ou évolution dans l'algorithme de layout ne s'applique qu'une seule fois dans `AbstractLinearLayouter`.
+- **Extensibilité** : pour ajouter un `DiagonalLayouter` ou un `FlowLayouter`, il suffit de sous-classer `AbstractLinearLayouter` et d'implémenter les hooks de direction.
+- **Principe ouvert/fermé** : les sous-classes sont fermées à la modification de l'algorithme général, mais ouvertes à l'extension de la direction.
+
+### Principe appliqué
+**Template Method Pattern** : `AbstractLinearLayouter` définit le squelette de l'algorithme (`calculateLayout` / `layout`) et délègue les variations de direction à des méthodes abstraites (*hooks*) que les sous-classes concrètes implémentent.
+
+Lien
+- Commit : lien vers le commit
+https://github.com/gamal-daoud/jhotdraw/commit/83a518697067f4a6be62dfe4b496f8d16f10d53e
+
+https://github.com/gamal-daoud/jhotdraw/commit/8d1e95caef518275255b3ec33bfd30d3c13f72ba
+
+
+
+## Fusion de classes : `ChopBezierConnector` et `ChopTriangleConnector` → `ChopDelegatingConnector`
+
+### Problème initial
+
+Le package `org.jhotdraw.draw.connector` contenait plusieurs connecteurs de type « Chop » (qui calculent le point de connexion à la frontière d'une figure). Parmi eux, `ChopBezierConnector` et `ChopTriangleConnector` étaient deux classes **structurellement identiques** :
+
+```java
+// ChopBezierConnector
+@Override
+protected Point2D.Double chop(Figure target, Point2D.Double from) {
+    BezierFigure bf = (BezierFigure) getConnectorTarget(target);
+    return bf.chop(from);
+}
+
+// ChopTriangleConnector
+@Override
+protected Point2D.Double chop(Figure target, Point2D.Double from) {
+    TriangleFigure bf = (TriangleFigure) getConnectorTarget(target);
+    return bf.chop(from);
+}
+```
+
+Ces deux classes ne diffèrent que par le **cast** de la figure cible. Leur existence séparée viole le principe DRY et force la répétition d'un même patron pour chaque figure ayant une méthode `chop()` spécifique.
+
+### Solution : fusion dans `ChopDelegatingConnector`
+
+Une nouvelle classe `ChopDelegatingConnector` a été créée. Elle étend `ChopRectangleConnector` (comme les deux classes d'origine) et accepte en paramètre une `BiFunction<Figure, Point2D.Double, Point2D.Double>` — c'est-à-dire une **stratégie de chop** injectable.
+
+```java
+// Utilisation pour une BezierFigure — remplace ChopBezierConnector
+new ChopDelegatingConnector(
+    bezierFigure,
+    (target, from) -> ((BezierFigure) target).chop(from)
+);
+
+// Utilisation pour une TriangleFigure — remplace ChopTriangleConnector
+new ChopDelegatingConnector(
+    triangleFigure,
+    (target, from) -> ((TriangleFigure) target).chop(from)
+);
+```
+
+Les classes `ChopBezierConnector` et `ChopTriangleConnector` sont conservées comme **façades dépréciées** (`@Deprecated`) pour assurer la compatibilité binaire avec le code existant, mais leur corps délègue entièrement à `ChopDelegatingConnector`.
+
+### Comparaison avant / après
+-----------------------------------------------------------------------------------------------------
+|                         | Avant                          | Après                                  |
+|-------------------------|--------------------------------|----------------------------------------|
+| Nombre de classes       | 2 classes quasi-identiques     | 1 classe + 2 façades dépréciées        |
+| Lignes dupliquées       | ~40 lignes                     | 0                                      |
+| Extensibilité           | Nécessite une nouvelle classe par type de figure | Une lambda suffit    |
+| Pattern appliqué        | Aucun                          | **Strategy** (via `BiFunction`)        |
+-----------------------------------------------------------------------------------------------------
+
+
+### Fichiers modifiés / créés
+--------------------------------------------------------------------------------------------------------------------
+| Fichier                                   | Action                                                               |
+|-------------------------------------------|----------------------------------------------------------------------|
+| `connector/ChopDelegatingConnector.java`  | **[NOUVEAU]** Classe générique fusionnant la logique des deux connecteurs                                                                                                        |
+| `connector/ChopBezierConnector.java`      | Conservé pour compatibilité (`@Deprecated`)                          |
+| `connector/ChopTriangleConnector.java`    | Conservé pour compatibilité (`@Deprecated`)                          |
+--------------------------------------------------------------------------------------------------------------------
+
+### Bénéfices
+
+- **Élimination de la duplication** : le patron de délégation n'existe plus qu'à un seul endroit.
+- **Respect du principe Open/Closed** : pour connecter un nouveau type de figure (ex. `DiamondFigure`), aucune nouvelle sous-classe de connecteur n'est nécessaire — une simple lambda suffit.
+- **Application du pattern Strategy** : la logique de chop est interchangeable à l'exécution.
+- **Réduction du nombre de classes** dans le package `connector`, ce qui améliore la lisibilité globale du projet.
+
+Lien
+- Commit : lien vers le commit
+https://github.com/gamal-daoud/jhotdraw/commit/
