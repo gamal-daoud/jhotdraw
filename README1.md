@@ -132,6 +132,32 @@ Lien
 - Commit : lien vers le commit
 https://github.com/wumpz/jhotdraw/commit/e14f513a6a4533465430242c2dd68c1df0363a5e
 
+ Réorganisation et Renommage dans la classe Attributes
+Fichier : `org.jhotdraw.draw.figure.Attributes.java`
+
+## Ce qui a été fait :
+1. Réorganisation de la structure de la classe:
+   - Les variables d'instance ont été regroupées en début de classe.
+   - Les constructeurs ont été placés après les variables.
+   - Les méthodes publiques (d'instance puis statiques) suivent.
+   - Les méthodes privées (comme `fireAttributeChanged`) ont été déplacées à la fin.
+   - L'interface interne `AttributeListener` a également été déplacée à la fin.
+
+-Raison: Suivre les conventions standard de Java pour améliorer la lisibilité et la navigation dans le code. Les méthodes privées et les interfaces internes ne doivent pas interrompre le flux des méthodes publiques.
+
+2.Correction des violations de nommage:
+   - L'attribut `attributes` a été renommé en `attributesCollection`.
+   - L'attribut `DEPENDENT` a été renommé en `dependent`.
+- Raison: Éviter la confusion entre le nom de l'attribut et le nom de la classe (`Attributes`), et respecter la convention de nommage `camelCase` pour les variables non constantes.
+
+3.Correction d'un bug de masquage de variable (Variable Shadowing):
+   - Dans la méthode `getAttributesRestoreData()`, la variable locale `dependent` masquait le champ `this.dependent`, ce qui pouvait causer des erreurs de référence. Elle a été renommée en `dependentList`.
+- Raison: Assurer que le code est robuste et éviter les erreurs logiques dues au masquage de variables de classe par des variables locales.
+
+Lien
+- Commit : lien vers le commit
+https://github.com/gamal-daoud/jhotdraw/commit/320a1f78452e117e4e087b73bb935b58a748e041
+
 
 # Suppression de duplication de code — `DefaultDrawingView` :
 Lien
@@ -153,7 +179,7 @@ Ces blocs ont été extraits dans deux méthodes privées :
 -------------------------------------------------
 | Métrique         | Avant | Après | Gain       |
 |------------------|-------|-------|------------|
-| Density          | 46.0% | 32.6% | -13.4%     |
+| Density          | 46.0% | 32.7% | -13.4%     |
 | Duplicated Lines | 714   | 494   |-220 lignes |
 | Duplicated Blocks| 19    |  15   | -4 blocs   |
 -------------------------------------------------
@@ -342,8 +368,8 @@ Le package `org.jhotdraw.draw.layouter` contenait deux classes `HorizontalLayout
 ```
 Avant :
   AbstractLayouter
-       ├── HorizontalLayouter   (calculateLayout + layout ~100 lignes)
-       └── VerticalLayouter     (calculateLayout + layout ~100 lignes, quasi-identiques)
+       ├── HorizontalLayouter   (calculateLayout + layout)
+       └── VerticalLayouter     (calculateLayout + layout quasi-identiques)
 ```
 
 ### Solution : nouvelle super-classe abstraite `AbstractLinearLayouter`
@@ -374,13 +400,13 @@ Après :
 | Fichier                                 | Action                                                                  |
 |-------------------------------------------------------------------------------------------------------------------|
 | `layouter/AbstractLinearLayouter.java`  =>  **[NOUVEAU]** Superclasse commune avec l'algorithme générique         |
-| `layouter/HorizontalLayouter.java`      => **[MODIFIÉ]** Étend désormais `AbstractLinearLayouter`; toute la logique dupliquée supprimée (~70 lignes retirées)                                                                           |
-| `layouter/VerticalLayouter.java`        =>  **[MODIFIÉ]** Étend désormais `AbstractLinearLayouter`; toute la logique dupliquée supprimée (~70 lignes retirées)                                                                           |
+| `layouter/HorizontalLayouter.java`      => **[MODIFIÉ]** Étend désormais `AbstractLinearLayouter`; toute la logique dupliquée supprimée (lignes retirées)                                                                           |
+| `layouter/VerticalLayouter.java`        =>  **[MODIFIÉ]** Étend désormais `AbstractLinearLayouter`; toute la logique dupliquée supprimée (lignes retirées)                                                                           |
 |-------------------------------------------------------------------------------------------------------------------|
 
 ### Bénéfices
 
-- **Suppression de ~140 lignes dupliquées** entre les deux classes.
+- **Suppression de des lignes dupliquées** entre les deux classes.
 - **Maintenabilité** : tout bug ou évolution dans l'algorithme de layout ne s'applique qu'une seule fois dans `AbstractLinearLayouter`.
 - **Extensibilité** : pour ajouter un `DiagonalLayouter` ou un `FlowLayouter`, il suffit de sous-classer `AbstractLinearLayouter` et d'implémenter les hooks de direction.
 - **Principe ouvert/fermé** : les sous-classes sont fermées à la modification de l'algorithme général, mais ouvertes à l'extension de la direction.
@@ -393,6 +419,8 @@ Lien
 https://github.com/gamal-daoud/jhotdraw/commit/83a518697067f4a6be62dfe4b496f8d16f10d53e
 
 https://github.com/gamal-daoud/jhotdraw/commit/8d1e95caef518275255b3ec33bfd30d3c13f72ba
+
+https://github.com/gamal-daoud/jhotdraw/commit/
 
 
 
@@ -445,7 +473,7 @@ Les classes `ChopBezierConnector` et `ChopTriangleConnector` sont conservées co
 |                         | Avant                          | Après                                  |
 |-------------------------|--------------------------------|----------------------------------------|
 | Nombre de classes       | 2 classes quasi-identiques     | 1 classe + 2 façades dépréciées        |
-| Lignes dupliquées       | ~40 lignes                     | 0                                      |
+| Lignes of codes         | ~469 lignes                    | 495                                    |
 | Extensibilité           | Nécessite une nouvelle classe par type de figure | Une lambda suffit    |
 | Pattern appliqué        | Aucun                          | **Strategy** (via `BiFunction`)        |
 -----------------------------------------------------------------------------------------------------
